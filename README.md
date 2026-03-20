@@ -1,7 +1,3 @@
-
-
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
-
 ## Project Overview
 
 Streamlit web app for chord voicing visualization and interval analysis. Accepts chord symbols (e.g., `Cmaj7`, `Dm7b5`) and progressions (e.g., `Dm7 | G7 | Cmaj7`), displays guitar fretboard diagrams, piano keyboard diagrams, tablature, musical score notation (VexFlow), and interval/progression analysis.
