@@ -289,6 +289,15 @@ def generate_all_shell_voicings(chord: dict, max_voicings: int = 8) -> List[List
     return result if result else [generate_voicing(chord)]
 
 
+def voicing_to_midi(voicing: List[int]) -> List[int]:
+    """Convert a voicing to MIDI note numbers, skipping muted strings."""
+    midi_notes = []
+    for s, fret in enumerate(voicing):
+        if fret >= 0:
+            midi_notes.append(STANDARD_TUNING[s] + fret)
+    return midi_notes
+
+
 def voicing_to_notes(voicing: List[int]) -> List[Optional[str]]:
     """Convert a voicing to note names per string."""
     notes = []

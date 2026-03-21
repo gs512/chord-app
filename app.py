@@ -12,9 +12,10 @@ import matplotlib.pyplot as plt
 from music_theory.chords import parse_chord, parse_progression, note_to_semitone
 from music_theory.guitar import (
     generate_voicing, generate_all_voicings, render_fretboard, voicing_to_tab,
-    voicing_to_notes, get_guitar_tab_for_progression,
+    voicing_to_notes, voicing_to_midi, get_guitar_tab_for_progression,
     generate_shell_voicing, generate_all_shell_voicings, render_scale_fretboard
 )
+from music_theory.audio import render_play_button_html
 from music_theory.keyboard import (
     generate_keyboard_voicing, generate_keyboard_inversions,
     render_piano, voicing_to_text,
@@ -81,6 +82,10 @@ def render_guitar_nav(chord, key_prefix, compact=False):
     notes = voicing_to_notes(voicing)
     notes_display = [n if n else 'X' for n in notes]
     st.caption(f"Notes: {' '.join(notes_display)}")
+    midi_notes = voicing_to_midi(voicing)
+    if midi_notes:
+        html = render_play_button_html(midi_notes, f"gv_{key_prefix}_{idx}", show_strum=True)
+        components.html(html, height=45)
     plt.close('all')
     return voicing
 
@@ -98,6 +103,10 @@ def render_keyboard_nav(chord, key_prefix, compact=False, figsize=(6, 2.5)):
     st.pyplot(fig, use_container_width=not compact)
     notes_str = ', '.join(f"{n}{o}" for n, o, _ in kb_voicing)
     st.caption(f"{notes_str}")
+    midi_notes = [m for _, _, m in kb_voicing]
+    if midi_notes:
+        html = render_play_button_html(midi_notes, f"ki_{key_prefix}_{idx}")
+        components.html(html, height=45)
     plt.close('all')
     return kb_voicing
 
@@ -116,6 +125,10 @@ def render_shell_guitar_nav(chord, key_prefix, compact=False):
     notes = voicing_to_notes(voicing)
     notes_display = [n if n else 'X' for n in notes]
     st.caption(f"Notes: {' '.join(notes_display)}")
+    midi_notes = voicing_to_midi(voicing)
+    if midi_notes:
+        html = render_play_button_html(midi_notes, f"sg_{key_prefix}_{idx}", show_strum=True)
+        components.html(html, height=45)
     plt.close('all')
     return voicing
 
@@ -133,6 +146,10 @@ def render_shell_keyboard_nav(chord, key_prefix, compact=False, figsize=(6, 2.5)
     st.pyplot(fig, use_container_width=not compact)
     notes_str = ', '.join(f"{n}{o}" for n, o, _ in kb_voicing)
     st.caption(f"{notes_str}")
+    midi_notes = [m for _, _, m in kb_voicing]
+    if midi_notes:
+        html = render_play_button_html(midi_notes, f"sk_{key_prefix}_{idx}")
+        components.html(html, height=45)
     plt.close('all')
     return kb_voicing
 
