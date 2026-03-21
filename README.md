@@ -9,7 +9,7 @@ Streamlit web app for chord voicing visualization and interval analysis. Accepts
 pip install .
 
 # Run the app
-streamlit run app.py
+uvicorn app_fastapi:app --host 0.0.0.0 --port 8886 --reload
 ```
 
 ## Architecture
