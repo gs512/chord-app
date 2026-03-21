@@ -1,16 +1,16 @@
 """
 Chord Voicing & Analysis — Streamlit App
-Displays guitar and keyboard voicings, tablature, musical score,
+Displays guitar and keyboard voicings, tablature,
 and interval analysis for chords and progressions.
 """
 
 import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
-plt.rcParams['figure.dpi'] = 120
-plt.rcParams['savefig.dpi'] = 120
 
 import hashlib
+import logging
+import time
 from pathlib import Path
 
 import streamlit as st
@@ -19,16 +19,14 @@ import pandas as pd
 
 from music_theory.chords import parse_chord, parse_progression, note_to_semitone, semitone_to_note
 from music_theory.guitar import (
-    generate_voicing, generate_all_voicings, render_fretboard, voicing_to_tab,
+    generate_all_voicings, render_fretboard, voicing_to_tab,
     voicing_to_notes, voicing_to_midi, get_guitar_tab_for_progression,
-    generate_shell_voicing, generate_all_shell_voicings, render_scale_fretboard
+    generate_all_shell_voicings, render_scale_fretboard
 )
 from music_theory.audio import render_play_button_html
 from music_theory.keyboard import (
-    generate_keyboard_voicing, generate_keyboard_inversions,
-    render_piano, voicing_to_text,
-    generate_shell_keyboard_voicing, generate_shell_keyboard_inversions,
-    render_scale_piano
+    generate_keyboard_inversions, render_piano,
+    generate_shell_keyboard_inversions, render_scale_piano
 )
 from music_theory.intervals import (
     analyze_chord_intervals, detect_key, roman_numeral_analysis,
@@ -36,28 +34,50 @@ from music_theory.intervals import (
     get_diatonic_chords, suggest_substitutions, suggest_scales, SCALES,
     render_circle_of_fifths
 )
-from music_theory.vexflow_render import (
-    render_single_chord_html, render_progression_html,
-    render_guitar_tab_html, render_combined_score_tab_html
-)
 from music_theory.voice_leading import (
     optimize_guitar_voice_leading, optimize_keyboard_voice_leading
 )
 
+# --- Config ---
+
+_DPI = 150
+plt.rcParams['figure.dpi'] = _DPI
+plt.rcParams['savefig.dpi'] = _DPI
+
 st.set_page_config(page_title="Chord Voicing & Analysis", layout="wide")
+
+# --- Logging / tracing ---
+
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s [%(levelname)s] %(message)s',
+    datefmt='%H:%M:%S',
+)
+_log = logging.getLogger('chord-app')
+
+_t0 = time.perf_counter()
+
+
+def _trace(label: str):
+    """Log elapsed time since script start. Check server logs for traces."""
+    elapsed = (time.perf_counter() - _t0) * 1000
+    _log.info(f'{label}: {elapsed:.0f}ms')
+
+
+_trace('imports done')
 
 st.title("Chord Voicing & Analysis")
 
 
-# --- PNG disk cache for matplotlib figures (critical for RPi) ---
+# --- PNG disk cache for matplotlib figures ---
 
 _CHART_CACHE = Path(__file__).parent / '.cache' / 'charts'
 _CHART_CACHE.mkdir(parents=True, exist_ok=True)
 
 
 def _chart_key(*parts):
-    """Filesystem-safe hash from arbitrary parts."""
-    raw = '|'.join(str(p) for p in parts)
+    """Filesystem-safe hash from arbitrary parts. Includes DPI so cache auto-invalidates on change."""
+    raw = '|'.join(str(p) for p in parts) + f'|dpi={_DPI}'
     return hashlib.md5(raw.encode()).hexdigest()
 
 
@@ -65,9 +85,11 @@ def _fig_to_cached_png(cache_key, render_fn):
     """Return path to cached PNG; render + save on miss."""
     path = _CHART_CACHE / f"{cache_key}.png"
     if not path.exists():
+        t = time.perf_counter()
         fig = render_fn()
         fig.savefig(path, bbox_inches='tight', facecolor='white', pad_inches=0.1)
         plt.close(fig)
+        _log.info(f'rendered {cache_key[:8]}… in {(time.perf_counter()-t)*1000:.0f}ms')
     return str(path)
 
 
@@ -206,6 +228,8 @@ def render_shell_keyboard_nav(chord, key_prefix, compact=False, figsize=(6, 2.5)
         components.html(html, height=45)
     return kb_voicing
 
+_trace('UI setup done')
+
 # --- Input Section ---
 input_mode = st.radio("Mode", ["Single Chord", "Chord Progression"], horizontal=True)
 
@@ -224,11 +248,12 @@ if input_mode == "Single Chord":
             st.error(f"Could not parse chord: {e}")
             st.stop()
 
+        _trace(f'parsed chord: {chord["symbol"]}')
         st.header(f"{chord['symbol']}")
 
         # Lazy view selector — only renders the active view
         single_view = st.radio(
-            "View", ["Guitar", "Keyboard", "Score", "Intervals", "Substitutions", "Scales"],
+            "View", ["Guitar", "Keyboard", "Intervals", "Substitutions", "Scales"],
             horizontal=True, key="single_view"
         )
 
@@ -245,11 +270,6 @@ if input_mode == "Single Chord":
 
             st.subheader("Shell Voicing (Root + 3rd + 7th)")
             render_shell_keyboard_nav(chord, f"single_shell_{chord_input}")
-
-        elif single_view == "Score":
-            st.subheader("Musical Score")
-            html = render_single_chord_html(chord)
-            components.html(html, height=280, scrolling=False)
 
         elif single_view == "Intervals":
             st.subheader("Interval Analysis")
@@ -354,12 +374,13 @@ else:
             key = selected_key
             mode = selected_mode
 
+        _trace(f'key detected: {key} {mode}, {len(chords)} chords')
         st.header(f"Progression in {key} {mode}")
         st.write(" — ".join(c['symbol'] for c in chords))
 
         # Lazy view selector — only renders the active view
         prog_view = st.radio(
-            "View", ["Guitar", "Keyboard", "Score", "Intervals", "Diatonic", "Substitutions", "Scales"],
+            "View", ["Guitar", "Keyboard", "Intervals", "Diatonic", "Substitutions", "Scales"],
             horizontal=True, key="prog_view"
         )
 
@@ -404,13 +425,6 @@ else:
             for i, chord in enumerate(chords):
                 with cols[i % len(cols)]:
                     render_keyboard_nav(chord, f"prog_k_{i}_{chord['symbol']}", compact=True, figsize=(4, 1.5))
-
-        elif prog_view == "Score":
-            st.subheader("Musical Score & Tab")
-            # Generate default voicings for score rendering
-            score_voicings = [_cached_all_voicings(c['symbol'])[0] for c in chords]
-            html = render_combined_score_tab_html(chords, score_voicings)
-            components.html(html, height=500, scrolling=True)
 
         elif prog_view == "Intervals":
             st.subheader("Chord Interval Analysis")
