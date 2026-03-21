@@ -239,10 +239,12 @@ if input_mode == "Single Chord":
             st.subheader("Chord Substitutions")
             subs = suggest_substitutions(chord)
             if subs:
+                show_sub_voicings = st.checkbox("Show voicing diagrams", key="single_sub_voicings")
                 for si, s in enumerate(subs):
                     sub_sym = s['symbol'].split('\u2192')[0].strip().split(' ')[0].strip()
-                    with st.expander(f"{s['type']}: {s['symbol']}", expanded=True):
-                        st.caption(s['reason'])
+                    st.markdown(f"**{s['type']}:** `{s['symbol']}`")
+                    st.caption(s['reason'])
+                    if show_sub_voicings:
                         try:
                             sub_chord = parse_chord(sub_sym)
                             col_g, col_k = st.columns(2)
@@ -252,6 +254,7 @@ if input_mode == "Single Chord":
                                 render_keyboard_nav(sub_chord, f"sub_kb_{chord_input}_{si}", compact=True)
                         except ValueError:
                             pass
+                    st.divider()
             else:
                 st.info("No common substitutions for this chord type.")
 
@@ -259,26 +262,27 @@ if input_mode == "Single Chord":
             st.subheader("Scales for Improvisation")
             scales = suggest_scales(chord)
             if scales:
+                show_scale_diags = st.checkbox("Show scale diagrams", key="single_scale_diags")
                 for i, s in enumerate(scales):
                     label = "Primary" if s['reason'].startswith('Primary') else "Compatible"
                     with st.expander(f"{s['scale']} ({label})", expanded=(i < 3)):
                         st.code(s['notes'], language=None)
                         st.caption(s['reason'])
-                        # Extract scale name and root for diagram
-                        parts = s['scale'].split(' ', 1)
-                        if len(parts) == 2:
-                            s_root, s_name = parts
-                            if s_name in SCALES:
-                                col_g, col_k = st.columns(2)
-                                with col_g:
-                                    fig = render_scale_fretboard(s_name, s_root, SCALES[s_name],
+                        if show_scale_diags:
+                            parts = s['scale'].split(' ', 1)
+                            if len(parts) == 2:
+                                s_root, s_name = parts
+                                if s_name in SCALES:
+                                    col_g, col_k = st.columns(2)
+                                    with col_g:
+                                        fig = render_scale_fretboard(s_name, s_root, SCALES[s_name],
+                                                                     use_flats=chord['use_flats'])
+                                        st.pyplot(fig, use_container_width=True)
+                                    with col_k:
+                                        fig = render_scale_piano(s_name, s_root, SCALES[s_name],
                                                                  use_flats=chord['use_flats'])
-                                    st.pyplot(fig, use_container_width=True)
-                                with col_k:
-                                    fig = render_scale_piano(s_name, s_root, SCALES[s_name],
-                                                             use_flats=chord['use_flats'])
-                                    st.pyplot(fig, use_container_width=True)
-                                plt.close('all')
+                                        st.pyplot(fig, use_container_width=True)
+                                    plt.close('all')
             else:
                 st.info("No scale suggestions available.")
 
@@ -477,6 +481,7 @@ else:
 
         with tab_subs:
             st.subheader("Substitution Suggestions")
+            show_sub_v = st.checkbox("Show voicing diagrams", key="prog_sub_voicings")
             for ci, chord in enumerate(chords):
                 subs = suggest_substitutions(chord, key, mode)
                 if subs:
@@ -485,15 +490,16 @@ else:
                             sub_sym = s['symbol'].split('\u2192')[0].strip().split(' ')[0].strip()
                             st.markdown(f"**{s['type']}:** `{s['symbol']}`")
                             st.caption(s['reason'])
-                            try:
-                                sub_chord = parse_chord(sub_sym)
-                                col_g, col_k = st.columns(2)
-                                with col_g:
-                                    render_guitar_nav(sub_chord, f"psub_g_{ci}_{si}_{sub_sym}", compact=True)
-                                with col_k:
-                                    render_keyboard_nav(sub_chord, f"psub_k_{ci}_{si}_{sub_sym}", compact=True, figsize=(4, 1.5))
-                            except ValueError:
-                                pass
+                            if show_sub_v:
+                                try:
+                                    sub_chord = parse_chord(sub_sym)
+                                    col_g, col_k = st.columns(2)
+                                    with col_g:
+                                        render_guitar_nav(sub_chord, f"psub_g_{ci}_{si}_{sub_sym}", compact=True)
+                                    with col_k:
+                                        render_keyboard_nav(sub_chord, f"psub_k_{ci}_{si}_{sub_sym}", compact=True, figsize=(4, 1.5))
+                                except ValueError:
+                                    pass
 
         with tab_scales:
             st.subheader("Scale Suggestions per Chord")
