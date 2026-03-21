@@ -59,8 +59,18 @@ def generate_voicing(chord: dict) -> List[int]:
     Generate a guitar voicing for the given chord.
     Returns list of 6 fret numbers (-1 = muted, 0 = open).
     """
+    all_v = generate_all_voicings(chord)
+    return all_v[0] if all_v else [-1, -1, -1, -1, -1, -1]
+
+
+def generate_all_voicings(chord: dict) -> List[List[int]]:
+    """
+    Generate multiple guitar voicings for the given chord.
+    Returns list of voicings, each a list of 6 fret numbers.
+    """
     root = chord['root']
     quality = chord['quality']
+    results = []
 
     # Check voicing database first
     key = (root, quality)
@@ -69,16 +79,29 @@ def generate_voicing(chord: dict) -> List[int]:
         if isinstance(voicing[0], list) or isinstance(voicing[0], tuple):
             v = voicing[0]
             if isinstance(v[0], tuple):
-                return list(v[0])
-            return list(v)
-        return list(voicing)
+                results.append(list(v[0]))
+            else:
+                results.append(list(v))
+        else:
+            results.append(list(voicing))
 
-    # Generate a barre chord voicing algorithmically
-    return _generate_barre_voicing(chord)
+    # Always add algorithmically generated voicings
+    algo_voicings = _generate_all_barre_voicings(chord)
+    for v in algo_voicings:
+        if v not in results:
+            results.append(v)
+
+    return results if results else [[-1, -1, -1, -1, -1, -1]]
 
 
 def _generate_barre_voicing(chord: dict) -> List[int]:
     """Generate a guitar voicing by finding playable positions on the fretboard."""
+    all_v = _generate_all_barre_voicings(chord)
+    return all_v[0] if all_v else [-1, -1, -1, -1, -1, -1]
+
+
+def _generate_all_barre_voicings(chord: dict, max_voicings: int = 8) -> List[List[int]]:
+    """Generate multiple guitar voicings by finding playable positions on the fretboard."""
     root_semitone = chord['root_semitone']
     chord_semitones = set((root_semitone + iv) % 12 for iv in chord['intervals_semitones'])
     bass_semitone = note_to_semitone(chord['bass']) if chord.get('bass') else root_semitone
@@ -90,11 +113,10 @@ def _generate_barre_voicing(chord: dict) -> List[int]:
         if p5 in chord_semitones:
             tone_sets.append(chord_semitones - {p5})
 
-    best_voicing = None
-    best_score = -1
+    candidates = []
 
     for chord_sems in tone_sets:
-        for root_string in [0, 1]:
+        for root_string in [0, 1, 2]:
             open_semitone = TUNING_SEMITONES[root_string]
             root_fret = (bass_semitone - open_semitone) % 12
 
@@ -152,19 +174,20 @@ def _generate_barre_voicing(chord: dict) -> List[int]:
                     for s, f in enumerate(voicing) if f >= 0
                 )
 
-                # Prefer: more chord tones covered, more strings, lower position,
-                # root in bass, fewer frets to span
+                if coverage < 2 or strings_played < 3:
+                    continue
+
                 score = (coverage * 15
                          + strings_played * 2
                          - span * 2
                          + (8 if has_root else 0)
-                         - base_fret)  # prefer lower positions
+                         - base_fret)
 
-                if score > best_score:
-                    best_score = score
-                    best_voicing = list(voicing)
+                if list(voicing) not in [c[1] for c in candidates]:
+                    candidates.append((score, list(voicing)))
 
-    return best_voicing or [-1, -1, -1, -1, -1, -1]
+    candidates.sort(key=lambda x: x[0], reverse=True)
+    return [v for _, v in candidates[:max_voicings]] or [[-1, -1, -1, -1, -1, -1]]
 
 
 def generate_shell_voicing(chord: dict) -> List[int]:

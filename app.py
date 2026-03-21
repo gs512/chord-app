@@ -11,12 +11,13 @@ import matplotlib.pyplot as plt
 
 from music_theory.chords import parse_chord, parse_progression, note_to_semitone
 from music_theory.guitar import (
-    generate_voicing, render_fretboard, voicing_to_tab,
+    generate_voicing, generate_all_voicings, render_fretboard, voicing_to_tab,
     voicing_to_notes, get_guitar_tab_for_progression,
     generate_shell_voicing, render_scale_fretboard
 )
 from music_theory.keyboard import (
-    generate_keyboard_voicing, render_piano, voicing_to_text,
+    generate_keyboard_voicing, generate_keyboard_inversions,
+    render_piano, voicing_to_text,
     generate_shell_keyboard_voicing, render_scale_piano
 )
 from music_theory.intervals import (
@@ -59,10 +60,33 @@ if input_mode == "Single Chord":
         )
 
         with tab_guitar:
-            voicing = generate_voicing(chord)
-            shell = generate_shell_voicing(chord)
+            all_voicings = generate_all_voicings(chord)
+            num_voicings = len(all_voicings)
+
+            # Session state for guitar voicing index
+            gv_key = f"guitar_voicing_{chord_input}"
+            if gv_key not in st.session_state:
+                st.session_state[gv_key] = 0
 
             st.subheader("Full Voicing")
+            nav_left, nav_label, nav_right = st.columns([1, 3, 1])
+            with nav_left:
+                if st.button("\u25c0 Prev", key="gv_prev", disabled=(st.session_state[gv_key] <= 0)):
+                    st.session_state[gv_key] -= 1
+                    st.rerun()
+            with nav_label:
+                st.markdown(
+                    f"<div style='text-align:center; padding-top:6px;'>Voicing {st.session_state[gv_key]+1} of {num_voicings}</div>",
+                    unsafe_allow_html=True
+                )
+            with nav_right:
+                if st.button("Next \u25b6", key="gv_next", disabled=(st.session_state[gv_key] >= num_voicings - 1)):
+                    st.session_state[gv_key] += 1
+                    st.rerun()
+
+            idx = min(st.session_state[gv_key], num_voicings - 1)
+            voicing = all_voicings[idx]
+
             col1, col2 = st.columns([1, 2])
             with col1:
                 fig = render_fretboard(chord, voicing)
@@ -74,6 +98,7 @@ if input_mode == "Single Chord":
                 notes_display = [n if n else 'X' for n in notes]
                 st.caption(f"Notes: {' '.join(notes_display)}")
 
+            shell = generate_shell_voicing(chord)
             st.subheader("Shell Voicing (Root + 3rd + 7th)")
             col1, col2 = st.columns([1, 2])
             with col1:
@@ -87,16 +112,46 @@ if input_mode == "Single Chord":
                 st.caption(f"Notes: {' '.join(shell_display)}")
 
         with tab_keyboard:
+            inversions = generate_keyboard_inversions(chord)
+            num_inversions = len(inversions)
+            _suffixes = {1: "st", 2: "nd", 3: "rd"}
+            inversion_names = ["Root Position"] + [
+                f"{i}{_suffixes.get(i, 'th')} Inversion" for i in range(1, num_inversions)
+            ]
+
+            # Session state for keyboard inversion index
+            ki_key = f"kb_inversion_{chord_input}"
+            if ki_key not in st.session_state:
+                st.session_state[ki_key] = 0
+
             st.subheader("Full Voicing")
+            nav_left, nav_label, nav_right = st.columns([1, 3, 1])
+            with nav_left:
+                if st.button("\u25c0 Prev", key="ki_prev", disabled=(st.session_state[ki_key] <= 0)):
+                    st.session_state[ki_key] -= 1
+                    st.rerun()
+            with nav_label:
+                inv_idx = min(st.session_state[ki_key], num_inversions - 1)
+                inv_name = inversion_names[inv_idx]
+                st.markdown(
+                    f"<div style='text-align:center; padding-top:6px;'>{inv_name} ({inv_idx+1} of {num_inversions})</div>",
+                    unsafe_allow_html=True
+                )
+            with nav_right:
+                if st.button("Next \u25b6", key="ki_next", disabled=(st.session_state[ki_key] >= num_inversions - 1)):
+                    st.session_state[ki_key] += 1
+                    st.rerun()
+
+            inv_idx = min(st.session_state[ki_key], num_inversions - 1)
+            kb_voicing = inversions[inv_idx]
+
             col1, col2 = st.columns([2, 1])
             with col1:
-                fig = render_piano(chord)
+                fig = render_piano(chord, voicing=kb_voicing)
                 st.pyplot(fig, use_container_width=False)
             with col2:
-                voicing_text = voicing_to_text(chord)
-                st.code(voicing_text, language=None)
-                kb_voicing = generate_keyboard_voicing(chord)
                 notes_str = ', '.join(f"{n}{o}" for n, o, _ in kb_voicing)
+                st.code(f"{chord['symbol']}: {notes_str}", language=None)
                 st.caption(f"Notes: {notes_str}")
 
             st.subheader("Shell Voicing (Root + 3rd + 7th)")
