@@ -106,6 +106,11 @@ def _cached_shell_keyboard_inversions(symbol):
 
 # --- Helpers to build voicing data for templates ---
 
+def _safe_id(symbol):
+    """Make chord symbol safe for use in HTML IDs and CSS selectors."""
+    return symbol.replace('#', 'sharp').replace('/', 'over')
+
+
 def _guitar_voicing_data(chord, voicing_idx=0):
     all_v = _cached_all_voicings(chord['symbol'])
     idx = min(voicing_idx, len(all_v) - 1)
@@ -119,7 +124,7 @@ def _guitar_voicing_data(chord, voicing_idx=0):
         'img': img, 'notes': [n or 'X' for n in notes], 'midi': midi,
         'tab': tab, 'idx': idx, 'total': len(all_v),
         'label': f"Voicing {idx+1}/{len(all_v)}",
-        'symbol': chord['symbol'],
+        'symbol': chord['symbol'], 'safe_id': _safe_id(chord['symbol']),
     }
 
 
@@ -136,7 +141,7 @@ def _shell_guitar_data(chord, voicing_idx=0):
         'img': img, 'notes': [n or 'X' for n in notes], 'midi': midi,
         'tab': tab, 'idx': idx, 'total': len(all_v),
         'label': f"Shell {idx+1}/{len(all_v)}",
-        'symbol': chord['symbol'],
+        'symbol': chord['symbol'], 'safe_id': _safe_id(chord['symbol']),
     }
 
 
@@ -151,7 +156,7 @@ def _keyboard_voicing_data(chord, inversion_idx=0, figsize=(6, 2.5)):
     return {
         'img': img, 'notes_str': ', '.join(f"{n}{o}" for n, o, _ in kb),
         'midi': midi, 'idx': idx, 'total': len(inversions),
-        'label': labels[idx], 'symbol': chord['symbol'],
+        'label': labels[idx], 'symbol': chord['symbol'], 'safe_id': _safe_id(chord['symbol']),
     }
 
 
@@ -166,7 +171,7 @@ def _shell_keyboard_data(chord, inversion_idx=0, figsize=(6, 2.5)):
     return {
         'img': img, 'notes_str': ', '.join(f"{n}{o}" for n, o, _ in kb),
         'midi': midi, 'idx': idx, 'total': len(inversions),
-        'label': labels[idx], 'symbol': chord['symbol'],
+        'label': labels[idx], 'symbol': chord['symbol'], 'safe_id': _safe_id(chord['symbol']),
     }
 
 
@@ -320,6 +325,8 @@ async def prog_content(request: Request,
                 notes = [semitone_to_note((dc['root_semitone'] + iv) % 12, dc['use_flats'])
                          for iv in dc['intervals_semitones']]
                 d['notes'] = '  '.join(notes)
+                d['gv'] = _guitar_voicing_data(dc)
+                d['kv'] = _keyboard_voicing_data(dc, figsize=(4, 1.5))
             except ValueError:
                 d['notes'] = ''
         ctx['diatonic'] = diatonic

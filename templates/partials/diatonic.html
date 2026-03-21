@@ -37,3 +37,22 @@
 {% else %}
 <p class="alert alert-success">All chords are diatonic to the key.</p>
 {% endif %}
+
+<h3>Diatonic Chord Voicings</h3>
+<div class="chord-grid cols-{{ [diatonic|length, 4] | min }}">
+{% for d in diatonic %}
+{% if d.gv is defined and d.gv %}
+<div class="chord-card">
+    <h4>{{ d.numeral }} — {{ d.symbol }}</h4>
+    <img src="{{ d.gv.img }}" alt="{{ d.symbol }} guitar" style="width:100%">
+    <img src="{{ d.kv.img }}" alt="{{ d.symbol }} keyboard" style="width:100%">
+    {% if d.gv.midi %}
+    <div class="btn-row">
+        <button class="btn btn-play" onclick="playNotes({{ d.gv.midi }}, false)">Play</button>
+        <button class="btn btn-strum" onclick="playNotes({{ d.gv.midi }}, true)">Strum</button>
+    </div>
+    {% endif %}
+</div>
+{% endif %}
+{% endfor %}
+</div>
