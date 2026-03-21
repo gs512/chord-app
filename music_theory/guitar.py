@@ -193,8 +193,16 @@ def _generate_all_barre_voicings(chord: dict, max_voicings: int = 8) -> List[Lis
 def generate_shell_voicing(chord: dict) -> List[int]:
     """
     Generate a shell voicing (root + 3rd + 7th only, 3 notes on 3 strings).
-    Two forms: root on string 6 or string 5.
     Returns the most compact voicing.
+    """
+    all_v = generate_all_shell_voicings(chord)
+    return all_v[0]
+
+
+def generate_all_shell_voicings(chord: dict, max_voicings: int = 8) -> List[List[int]]:
+    """
+    Generate multiple shell voicings (root + 3rd + 7th) at various positions.
+    Returns list of voicings sorted by quality score.
     """
     root_sem = chord['root_semitone']
     intervals = chord['intervals_semitones']
@@ -204,37 +212,33 @@ def generate_shell_voicing(chord: dict) -> List[int]:
     seventh_sem = None
     for iv in intervals:
         iv_mod = iv % 12
-        if iv_mod in (3, 4) and third_sem is None:  # m3 or M3
+        if iv_mod in (3, 4) and third_sem is None:
             third_sem = (root_sem + iv) % 12
-        elif iv_mod in (10, 11) and seventh_sem is None:  # b7 or M7
+        elif iv_mod in (10, 11) and seventh_sem is None:
             seventh_sem = (root_sem + iv) % 12
 
-    # If no 7th (e.g. triad), use 5th; if no 3rd (e.g. sus), use 4th or 2nd
     if third_sem is None:
         for iv in intervals:
-            if iv % 12 == 5:  # P4 (sus4)
+            if iv % 12 == 5:
                 third_sem = (root_sem + iv) % 12
                 break
-            elif iv % 12 == 2:  # M2 (sus2)
+            elif iv % 12 == 2:
                 third_sem = (root_sem + iv) % 12
                 break
     if seventh_sem is None:
         for iv in intervals:
-            if iv % 12 == 7:  # P5
+            if iv % 12 == 7:
                 seventh_sem = (root_sem + iv) % 12
                 break
 
     if third_sem is None or seventh_sem is None:
-        # Fallback: use full voicing algorithm
-        return generate_voicing(chord)
+        return [generate_voicing(chord)]
 
-    shell_tones = {root_sem, third_sem, seventh_sem}
+    candidates = []
 
-    best_voicing = None
-    best_score = -1
-
-    # Shell voicings: root on string 6 (strings 6,5,4) or root on string 5 (strings 5,4,3)
-    for root_str, string_set in [(0, [0, 1, 2]), (1, [1, 2, 3])]:
+    # Try root on strings 6, 5, and 4 with different string groupings
+    string_sets = [(0, [0, 1, 2]), (1, [1, 2, 3]), (0, [0, 2, 3]), (1, [1, 3, 4])]
+    for _, string_set in string_sets:
         open_sem = TUNING_SEMITONES[string_set[0]]
         root_fret = (root_sem - open_sem) % 12
 
@@ -245,11 +249,9 @@ def generate_shell_voicing(chord: dict) -> List[int]:
             voicing = [-1] * 6
             voicing[string_set[0]] = base_fret
 
-            # Assign 3rd and 7th to the other two strings
             remaining_tones = [third_sem, seventh_sem]
             remaining_strings = string_set[1:]
 
-            # Try both assignments, pick the more compact one
             for assignment in [(0, 1), (1, 0)]:
                 v = list(voicing)
                 ok = True
@@ -279,11 +281,12 @@ def generate_shell_voicing(chord: dict) -> List[int]:
                     continue
 
                 score = -span - base_fret + (10 if base_fret <= 7 else 0)
-                if score > best_score:
-                    best_score = score
-                    best_voicing = v
+                if v not in [c[1] for c in candidates]:
+                    candidates.append((score, v))
 
-    return best_voicing or generate_voicing(chord)
+    candidates.sort(key=lambda x: x[0], reverse=True)
+    result = [v for _, v in candidates[:max_voicings]]
+    return result if result else [generate_voicing(chord)]
 
 
 def voicing_to_notes(voicing: List[int]) -> List[Optional[str]]:

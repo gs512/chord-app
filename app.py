@@ -13,12 +13,13 @@ from music_theory.chords import parse_chord, parse_progression, note_to_semitone
 from music_theory.guitar import (
     generate_voicing, generate_all_voicings, render_fretboard, voicing_to_tab,
     voicing_to_notes, get_guitar_tab_for_progression,
-    generate_shell_voicing, render_scale_fretboard
+    generate_shell_voicing, generate_all_shell_voicings, render_scale_fretboard
 )
 from music_theory.keyboard import (
     generate_keyboard_voicing, generate_keyboard_inversions,
     render_piano, voicing_to_text,
-    generate_shell_keyboard_voicing, render_scale_piano
+    generate_shell_keyboard_voicing, generate_shell_keyboard_inversions,
+    render_scale_piano
 )
 from music_theory.intervals import (
     analyze_chord_intervals, detect_key, roman_numeral_analysis,
@@ -100,6 +101,41 @@ def render_keyboard_nav(chord, key_prefix, compact=False, figsize=(6, 2.5)):
     plt.close('all')
     return kb_voicing
 
+
+def render_shell_guitar_nav(chord, key_prefix, compact=False):
+    """Render a guitar shell voicing fretboard with navigation arrows."""
+    all_v = generate_all_shell_voicings(chord)
+    labels = [f"Shell {i+1}/{len(all_v)}" for i in range(len(all_v))]
+    idx = _nav_buttons(f"sg_{key_prefix}", len(all_v), labels, compact=compact)
+    voicing = all_v[idx]
+    fig = render_fretboard(chord, voicing)
+    st.pyplot(fig, use_container_width=False)
+    if not compact:
+        tab_text = voicing_to_tab(chord['symbol'] + ' (shell)', voicing)
+        st.code(tab_text, language=None)
+    notes = voicing_to_notes(voicing)
+    notes_display = [n if n else 'X' for n in notes]
+    st.caption(f"Notes: {' '.join(notes_display)}")
+    plt.close('all')
+    return voicing
+
+
+def render_shell_keyboard_nav(chord, key_prefix, compact=False, figsize=(6, 2.5)):
+    """Render a piano shell voicing with inversion navigation arrows."""
+    inversions = generate_shell_keyboard_inversions(chord)
+    _suffixes = {1: "st", 2: "nd", 3: "rd"}
+    labels = ["Root Position"] + [
+        f"{i}{_suffixes.get(i, 'th')} Inv." for i in range(1, len(inversions))
+    ]
+    idx = _nav_buttons(f"sk_{key_prefix}", len(inversions), labels, compact=compact)
+    kb_voicing = inversions[idx]
+    fig = render_piano(chord, voicing=kb_voicing, figsize=figsize)
+    st.pyplot(fig, use_container_width=not compact)
+    notes_str = ', '.join(f"{n}{o}" for n, o, _ in kb_voicing)
+    st.caption(f"{notes_str}")
+    plt.close('all')
+    return kb_voicing
+
 # --- Input Section ---
 input_mode = st.radio("Mode", ["Single Chord", "Chord Progression"], horizontal=True)
 
@@ -129,33 +165,15 @@ if input_mode == "Single Chord":
             st.subheader("Full Voicing")
             voicing = render_guitar_nav(chord, f"single_{chord_input}")
 
-            shell = generate_shell_voicing(chord)
             st.subheader("Shell Voicing (Root + 3rd + 7th)")
-            col1, col2 = st.columns([1, 2])
-            with col1:
-                fig = render_fretboard(chord, shell)
-                st.pyplot(fig, use_container_width=False)
-            with col2:
-                tab_text = voicing_to_tab(chord['symbol'] + ' (shell)', shell)
-                st.code(tab_text, language=None)
-                shell_notes = voicing_to_notes(shell)
-                shell_display = [n if n else 'X' for n in shell_notes]
-                st.caption(f"Notes: {' '.join(shell_display)}")
+            render_shell_guitar_nav(chord, f"single_shell_{chord_input}")
 
         with tab_keyboard:
             st.subheader("Full Voicing")
             render_keyboard_nav(chord, f"single_{chord_input}")
 
             st.subheader("Shell Voicing (Root + 3rd + 7th)")
-            shell_kb = generate_shell_keyboard_voicing(chord)
-            col1, col2 = st.columns([2, 1])
-            with col1:
-                fig = render_piano(chord, voicing=shell_kb)
-                st.pyplot(fig, use_container_width=False)
-            with col2:
-                shell_notes_str = ', '.join(f"{n}{o}" for n, o, _ in shell_kb)
-                st.code(f"{chord['symbol']} (shell): {shell_notes_str}", language=None)
-                st.caption(f"LH: root | RH: 3rd + 7th")
+            render_shell_keyboard_nav(chord, f"single_shell_{chord_input}")
 
         with tab_score:
             st.subheader("Musical Score")

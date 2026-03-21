@@ -114,6 +114,27 @@ def generate_keyboard_inversions(chord: dict, base_octave: int = 4) -> List[List
     return inversions
 
 
+def generate_shell_keyboard_inversions(chord: dict, base_octave: int = 3) -> List[List[Tuple[str, int, int]]]:
+    """
+    Generate all inversions of the shell keyboard voicing (root + 3rd + 7th).
+    """
+    root_voicing = generate_shell_keyboard_voicing(chord, base_octave)
+    if len(root_voicing) <= 1:
+        return [root_voicing]
+
+    inversions = [root_voicing]
+    current = list(root_voicing)
+
+    for _ in range(len(root_voicing) - 1):
+        bottom = current[0]
+        note_name, octave, midi = bottom
+        new_note = (note_name, octave + 1, midi + 12)
+        current = current[1:] + [new_note]
+        inversions.append(list(current))
+
+    return inversions
+
+
 def voicing_to_text(chord: dict) -> str:
     """Generate text representation of keyboard voicing."""
     voicing = generate_keyboard_voicing(chord)
