@@ -440,8 +440,17 @@ else:
             }
             ct = _ct_map[chord_type]
             diatonic = get_diatonic_chords(key, mode, chord_type=ct)
+            for d in diatonic:
+                try:
+                    dc = parse_chord(d['symbol'])
+                    notes = [semitone_to_note((dc['root_semitone'] + iv) % 12, dc['use_flats'])
+                             for iv in dc['intervals_semitones']]
+                    d['notes'] = '  '.join(notes)
+                except ValueError:
+                    d['notes'] = ''
             dia_df = pd.DataFrame(diatonic)
-            dia_df.columns = ['Numeral', 'Root', 'Quality', 'Chord']
+            dia_df = dia_df[['numeral', 'symbol', 'notes', 'quality']]
+            dia_df.columns = ['Numeral', 'Chord', 'Notes', 'Quality']
             st.table(dia_df)
 
             # Highlight which progression chords are diatonic vs chromatic
