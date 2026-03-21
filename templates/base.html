@@ -55,6 +55,9 @@
                        placeholder="e.g. Dm7 | G7 | Cmaj7 | Am7"
                        hx-get="/partial/prog_content" hx-trigger="keyup changed delay:400ms"
                        hx-target="#content" hx-include="[name='prog_view'],[name='sel_key'],[name='sel_mode']">
+                <select id="prog_history" onchange="loadProgHistory(this)" title="Recent progressions">
+                    <option value="">Recent...</option>
+                </select>
             </div>
             <div class="controls">
                 <label for="sel_key">Key:</label>
@@ -127,6 +130,64 @@
             });
         });
     }
+
+    /* --- Progression history (localStorage) --- */
+    var PROG_KEY = 'chord_app_prog_history';
+    var MAX_HISTORY = 10;
+
+    function getProgHistory() {
+        try { return JSON.parse(localStorage.getItem(PROG_KEY)) || []; }
+        catch(e) { return []; }
+    }
+
+    function saveProgHistory(prog) {
+        prog = prog.trim();
+        if (!prog) return;
+        var hist = getProgHistory().filter(function(h) { return h !== prog; });
+        hist.unshift(prog);
+        if (hist.length > MAX_HISTORY) hist = hist.slice(0, MAX_HISTORY);
+        localStorage.setItem(PROG_KEY, JSON.stringify(hist));
+        refreshProgDropdown();
+    }
+
+    function refreshProgDropdown() {
+        var sel = document.getElementById('prog_history');
+        if (!sel) return;
+        var hist = getProgHistory();
+        sel.innerHTML = '<option value="">Recent...</option>';
+        hist.forEach(function(h) {
+            var opt = document.createElement('option');
+            opt.value = h;
+            opt.textContent = h;
+            sel.appendChild(opt);
+        });
+    }
+
+    function loadProgHistory(sel) {
+        if (!sel.value) return;
+        var input = document.getElementById('prog_input');
+        if (input) {
+            input.value = sel.value;
+            htmx.trigger(input, 'keyup');
+        }
+        sel.value = '';
+    }
+
+    // Save progression on successful HTMX response from prog_content
+    document.addEventListener('htmx:afterRequest', function(e) {
+        if (e.detail.pathInfo && e.detail.pathInfo.requestPath &&
+            e.detail.pathInfo.requestPath.indexOf('/partial/prog_content') === 0 &&
+            e.detail.successful) {
+            var input = document.getElementById('prog_input');
+            if (input && input.value.trim()) saveProgHistory(input.value);
+        }
+    });
+
+    // Populate dropdown on page load and after mode-form swap
+    document.addEventListener('DOMContentLoaded', refreshProgDropdown);
+    document.addEventListener('htmx:afterSwap', function(e) {
+        if (e.detail.target && e.detail.target.id === 'mode-form') refreshProgDropdown();
+    });
     </script>
 </body>
 </html>

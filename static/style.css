@@ -18,6 +18,7 @@ h3 { font-size: 1em; margin: 12px 0 6px; }
     font-size: 0.9em; background: #fff;
 }
 .controls input[type="text"] { flex: 1; min-width: 180px; }
+#prog_history { max-width: 200px; }
 
 /* Radio pill group */
 .radio-group { display: flex; flex-wrap: wrap; gap: 0; border: 1px solid #ccc; border-radius: 6px; overflow: hidden; }

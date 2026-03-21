@@ -24,6 +24,9 @@
            placeholder="e.g. Dm7 | G7 | Cmaj7 | Am7"
            hx-get="/partial/prog_content" hx-trigger="keyup changed delay:400ms"
            hx-target="#content" hx-include="[name='prog_view'],[name='sel_key'],[name='sel_mode']">
+    <select id="prog_history" onchange="loadProgHistory(this)" title="Recent progressions">
+        <option value="">Recent...</option>
+    </select>
 </div>
 <div class="controls">
     <label for="sel_key">Key:</label>
