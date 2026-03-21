@@ -1,0 +1,9 @@
+<h2>{{ chord.symbol }} — Full Voicing</h2>
+{% set v = kv %}
+{% set vtype = "keyboard" %}
+{% include "partials/_voicing_keyboard.html" %}
+
+<h2>Shell Voicing (Root + 3rd + 7th)</h2>
+{% set v = skv %}
+{% set vtype = "shell_keyboard" %}
+{% include "partials/_voicing_keyboard.html" %}

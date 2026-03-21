@@ -152,14 +152,24 @@ def render_piano(chord: dict, figsize=(6, 2.5), voicing=None) -> plt.Figure:
         voicing = generate_keyboard_voicing(chord)
     use_flats = chord['use_flats']
 
-    # Determine range: show ~2 octaves centered on the voicing
+    # Determine range: cover all notes with padding, minimum 2 octaves
     midi_notes = [m for _, _, m in voicing]
-    center = sum(midi_notes) // len(midi_notes)
-    start_midi = max(36, center - 12)  # C2 minimum
-    # Align to C
-    start_midi = start_midi - (start_midi % 12)
-    num_octaves = 2
-    end_midi = start_midi + num_octaves * 12
+    min_note = min(midi_notes)
+    max_note = max(midi_notes)
+
+    # Start at C below the lowest note, end at C above the highest
+    start_midi = min_note - (min_note % 12)
+    end_midi = max_note - (max_note % 12) + 12
+
+    # Ensure at least 2 octaves for visual clarity
+    if end_midi - start_midi < 24:
+        center = (min_note + max_note) // 2
+        start_midi = center - 12
+        start_midi = start_midi - (start_midi % 12)
+        end_midi = start_midi + 24
+
+    start_midi = max(36, start_midi)
+    num_octaves = (end_midi - start_midi) // 12
 
     # Pressed keys by absolute MIDI value (not mod 12, to avoid highlighting all octaves)
     pressed_midi = set(m for _, _, m in voicing)

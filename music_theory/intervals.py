@@ -3,6 +3,8 @@ Interval analysis for individual chords and chord progressions.
 """
 
 from typing import List, Optional, Tuple
+import numpy as np
+import matplotlib.pyplot as plt
 from .chords import (
     parse_chord, note_to_semitone, semitone_to_note,
     SEMITONE_TO_INTERVAL, SEMITONE_TO_ROOT_INTERVAL,
@@ -293,16 +295,97 @@ def detect_patterns(chords: List[dict], key: Optional[str] = None,
 
 # --- Diatonic chords ---
 
+# Diatonic triad qualities for each scale degree
+DIATONIC_MAJOR_TRIADS = [
+    ('I', 'maj'), ('ii', 'm'), ('iii', 'm'), ('IV', 'maj'),
+    ('V', 'maj'), ('vi', 'm'), ('vii\u00b0', 'dim'),
+]
+
+DIATONIC_MINOR_TRIADS = [
+    ('i', 'm'), ('ii\u00b0', 'dim'), ('III', 'maj'), ('iv', 'm'),
+    ('V', 'maj'), ('VI', 'maj'), ('vii\u00b0', 'dim'),
+]
+
 # Diatonic 7th chord qualities for each scale degree
 DIATONIC_MAJOR_7THS = [
     ('I', 'maj7'), ('ii', 'm7'), ('iii', 'm7'), ('IV', 'maj7'),
-    ('V', '7'), ('vi', 'm7'), ('vii', 'm7b5'),
+    ('V', '7'), ('vi', 'm7'), ('vii\u00f8', 'm7b5'),
 ]
 
 DIATONIC_MINOR_7THS = [
-    ('i', 'mM7'), ('ii', 'm7b5'), ('bIII', 'maj7'), ('iv', 'm7'),
-    ('V', '7'), ('bVI', 'maj7'), ('bVII', '7'),
+    ('i', 'mM7'), ('ii\u00f8', 'm7b5'), ('III', 'maj7'), ('iv', 'm7'),
+    ('V', '7'), ('VI', 'maj7'), ('vii\u00b0', 'dim7'),
 ]
+
+# Diatonic 9th chords
+DIATONIC_MAJOR_9THS = [
+    ('I', 'maj9'), ('ii', 'm9'), ('iii', 'm7'), ('IV', 'maj9'),
+    ('V', '9'), ('vi', 'm9'), ('vii\u00f8', 'm7b5'),
+]
+# iii stays m7 (diatonic 9th is b9, uncommon), vii stays m7b5 (same reason)
+
+DIATONIC_MINOR_9THS = [
+    ('i', 'mM7'), ('ii\u00f8', 'm7b5'), ('III', 'maj9'), ('iv', 'm9'),
+    ('V', '9'), ('VI', 'maj9'), ('vii\u00b0', 'dim7'),
+]
+# i stays mM7 (9 works but mM9 not in formulas), ii/vii stay as-is (b9)
+
+# Diatonic sus4 chords
+DIATONIC_MAJOR_SUS4 = [
+    ('I', 'sus4'), ('II', 'sus4'), ('III', 'sus4'), ('IV', 'sus4'),
+    ('V', 'sus4'), ('VI', 'sus4'), ('VII', 'sus4'),
+]
+
+DIATONIC_MINOR_SUS4 = [
+    ('i', 'sus4'), ('II', 'sus4'), ('III', 'sus4'), ('iv', 'sus4'),
+    ('V', 'sus4'), ('VI', 'sus4'), ('VII', 'sus4'),
+]
+
+# Diatonic sus2 chords
+DIATONIC_MAJOR_SUS2 = [
+    ('I', 'sus2'), ('II', 'sus2'), ('III', 'sus2'), ('IV', 'sus2'),
+    ('V', 'sus2'), ('VI', 'sus2'), ('VII', 'sus2'),
+]
+
+DIATONIC_MINOR_SUS2 = [
+    ('i', 'sus2'), ('II', 'sus2'), ('III', 'sus2'), ('iv', 'sus2'),
+    ('V', 'sus2'), ('VI', 'sus2'), ('VII', 'sus2'),
+]
+
+# Diatonic add9 chords
+DIATONIC_MAJOR_ADD9 = [
+    ('I', 'add9'), ('ii', 'madd9'), ('iii', 'm'), ('IV', 'add9'),
+    ('V', 'add9'), ('vi', 'madd9'), ('vii\u00b0', 'dim'),
+]
+# iii and vii get b9 diatonically, so fall back to simpler forms
+
+DIATONIC_MINOR_ADD9 = [
+    ('i', 'madd9'), ('ii\u00b0', 'dim'), ('III', 'add9'), ('iv', 'madd9'),
+    ('V', 'add9'), ('VI', 'add9'), ('vii\u00b0', 'dim'),
+]
+
+# Diatonic 6th chords
+DIATONIC_MAJOR_6THS = [
+    ('I', '6'), ('ii', 'm6'), ('iii', 'm'), ('IV', '6'),
+    ('V', '6'), ('vi', 'm6'), ('vii\u00b0', 'dim'),
+]
+# iii gets b6 diatonically (dim interval), vii same — fall back
+
+DIATONIC_MINOR_6THS = [
+    ('i', 'm6'), ('ii\u00b0', 'dim'), ('III', '6'), ('iv', 'm6'),
+    ('V', '6'), ('VI', '6'), ('vii\u00b0', 'dim'),
+]
+
+# Lookup table for chord_type -> (major_degrees, minor_degrees)
+DIATONIC_TABLES = {
+    'triad': (DIATONIC_MAJOR_TRIADS, DIATONIC_MINOR_TRIADS),
+    '7th':   (DIATONIC_MAJOR_7THS, DIATONIC_MINOR_7THS),
+    '9th':   (DIATONIC_MAJOR_9THS, DIATONIC_MINOR_9THS),
+    'sus4':  (DIATONIC_MAJOR_SUS4, DIATONIC_MINOR_SUS4),
+    'sus2':  (DIATONIC_MAJOR_SUS2, DIATONIC_MINOR_SUS2),
+    'add9':  (DIATONIC_MAJOR_ADD9, DIATONIC_MINOR_ADD9),
+    '6th':   (DIATONIC_MAJOR_6THS, DIATONIC_MINOR_6THS),
+}
 
 # Scale definitions: name -> list of semitone intervals from root
 SCALES = {
@@ -328,9 +411,10 @@ SCALES = {
 }
 
 
-def get_diatonic_chords(key: str, mode: str = 'major') -> List[dict]:
+def get_diatonic_chords(key: str, mode: str = 'major', chord_type: str = '7th') -> List[dict]:
     """
-    Return the diatonic 7th chords for a given key.
+    Return the diatonic chords for a given key.
+    chord_type: 'triad', '7th', '9th', 'sus4', 'sus2', 'add9', '6th'.
     Each entry: {numeral, root, quality, symbol}
     """
     key_semitone = note_to_semitone(key)
@@ -338,10 +422,11 @@ def get_diatonic_chords(key: str, mode: str = 'major') -> List[dict]:
 
     if mode == 'minor':
         scale = [0, 2, 3, 5, 7, 8, 10]
-        degrees = DIATONIC_MINOR_7THS
     else:
         scale = MAJOR_SCALE
-        degrees = DIATONIC_MAJOR_7THS
+
+    major_table, minor_table = DIATONIC_TABLES.get(chord_type, DIATONIC_TABLES['7th'])
+    degrees = minor_table if mode == 'minor' else major_table
 
     result = []
     for i, (numeral, quality) in enumerate(degrees):
@@ -514,3 +599,96 @@ def _primary_scales_for_quality(quality: str) -> List[str]:
         return ['Major (Ionian)', 'Minor Pentatonic']
     else:
         return ['Major (Ionian)']
+
+
+# --- Circle of Fifths ---
+
+# Keys in order of fifths (clockwise from top)
+CIRCLE_OF_FIFTHS_MAJOR = ['C', 'G', 'D', 'A', 'E', 'B', 'F#/Gb', 'Db', 'Ab', 'Eb', 'Bb', 'F']
+CIRCLE_OF_FIFTHS_MINOR = ['Am', 'Em', 'Bm', 'F#m', 'C#m', 'G#m/Abm', 'Ebm', 'Bbm', 'Fm', 'Cm', 'Gm', 'Dm']
+CIRCLE_OF_FIFTHS_SHARPS_FLATS = [
+    '0', '1\u266f', '2\u266f', '3\u266f', '4\u266f', '5\u266f', '6\u266f/6\u266d',
+    '5\u266d', '4\u266d', '3\u266d', '2\u266d', '1\u266d'
+]
+
+
+def render_circle_of_fifths(current_key: str = 'C', current_mode: str = 'major',
+                             figsize=(6, 6)) -> 'plt.Figure':
+    """
+    Render a Circle of Fifths diagram with the current key highlighted.
+    Returns a matplotlib Figure.
+    """
+    fig, ax = plt.subplots(1, 1, figsize=figsize, subplot_kw={'projection': 'polar'})
+
+    n = 12
+    angles = [np.pi / 2 - (2 * np.pi * i / n) for i in range(n)]  # start at top, clockwise
+
+    # Normalize current key for matching
+    current_key_norm = current_key.replace('#', '\u266f').replace('b', '\u266d') if len(current_key) > 1 else current_key
+
+    # Draw segments
+    segment_width = 2 * np.pi / n
+    outer_radius = 1.0
+    inner_radius = 0.65
+    center_radius = 0.4
+
+    for i in range(n):
+        angle = angles[i]
+        theta_start = angle - segment_width / 2
+        theta_range = np.linspace(theta_start, theta_start + segment_width, 30)
+
+        # Check if this is the highlighted key
+        major_key = CIRCLE_OF_FIFTHS_MAJOR[i]
+        minor_key = CIRCLE_OF_FIFTHS_MINOR[i]
+
+        is_major_match = (current_mode == 'major' and
+                          (current_key in major_key.split('/') or current_key_norm in major_key))
+        is_minor_match = (current_mode == 'minor' and
+                          (current_key + 'm' in minor_key.split('/') or
+                           current_key_norm + 'm' in minor_key))
+
+        # Outer segment (major keys)
+        if is_major_match:
+            ax.fill_between(theta_range, inner_radius, outer_radius,
+                            color='#E74C3C', alpha=0.3)
+        elif is_minor_match:
+            ax.fill_between(theta_range, center_radius, inner_radius,
+                            color='#E74C3C', alpha=0.3)
+
+        # Draw segment borders
+        ax.plot(theta_range, [outer_radius] * len(theta_range), 'k-', linewidth=0.5)
+        ax.plot(theta_range, [inner_radius] * len(theta_range), 'k-', linewidth=0.5)
+        ax.plot(theta_range, [center_radius] * len(theta_range), 'k-', linewidth=0.3)
+        ax.plot([theta_start, theta_start], [center_radius, outer_radius], 'k-', linewidth=0.5)
+
+        # Major key label (outer ring)
+        major_color = '#E74C3C' if is_major_match else '#2C3E50'
+        major_weight = 'bold' if is_major_match else 'normal'
+        ax.text(angle, (outer_radius + inner_radius) / 2, major_key,
+                ha='center', va='center', fontsize=10, fontweight=major_weight,
+                color=major_color)
+
+        # Minor key label (inner ring)
+        minor_color = '#E74C3C' if is_minor_match else '#666'
+        minor_weight = 'bold' if is_minor_match else 'normal'
+        ax.text(angle, (inner_radius + center_radius) / 2, minor_key,
+                ha='center', va='center', fontsize=7, fontweight=minor_weight,
+                color=minor_color)
+
+        # Sharps/flats label (center area)
+        ax.text(angle, center_radius * 0.55, CIRCLE_OF_FIFTHS_SHARPS_FLATS[i],
+                ha='center', va='center', fontsize=6, color='#999')
+
+    # Close the last segment border
+    last_start = angles[0] - segment_width / 2 + 2 * np.pi
+    ax.plot([angles[0] + segment_width / 2, angles[0] + segment_width / 2],
+            [center_radius, outer_radius], 'k-', linewidth=0.5)
+
+    ax.set_ylim(0, outer_radius + 0.15)
+    ax.set_yticks([])
+    ax.set_xticks([])
+    ax.spines['polar'].set_visible(False)
+    ax.set_title('Circle of Fifths', fontsize=14, fontweight='bold', pad=20)
+
+    fig.tight_layout()
+    return fig

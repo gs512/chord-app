@@ -1,12 +1,14 @@
 [project]
 name = "chord-app"
-version = "0.1.0"
+version = "0.2.0"
 description = "Chord voicing visualization and interval analysis"
 requires-python = ">=3.10"
 dependencies = [
-    "streamlit>=1.30.0",
+    "fastapi>=0.115.0",
+    "uvicorn[standard]>=0.30.0",
+    "jinja2>=3.1.0",
     "matplotlib>=3.8.0",
 ]
 
-[project.scripts]
-chord-app = "streamlit.web.cli:main"
+[tool.setuptools.packages.find]
+include = ["music_theory*"]

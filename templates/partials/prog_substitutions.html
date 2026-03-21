@@ -1,0 +1,31 @@
+<h2>Substitution Suggestions</h2>
+{% for chord, subs in chord_subs %}
+{% if subs %}
+<details>
+    <summary>{{ chord.symbol }}</summary>
+    <div class="detail-body">
+    {% for s in subs %}
+        <div style="margin-bottom:8px">
+            <strong>{{ s.type }}:</strong> <code>{{ s.symbol }}</code>
+            <p class="text-muted">{{ s.reason }}</p>
+            {% if s.gv is defined and s.gv %}
+            <div class="two-col">
+                <div>
+                    {% set v = s.gv %}
+                    {% set vtype = "guitar" %}
+                    {% include "partials/_voicing_guitar.html" %}
+                </div>
+                <div>
+                    {% set v = s.kv %}
+                    {% set vtype = "keyboard" %}
+                    {% include "partials/_voicing_keyboard.html" %}
+                </div>
+            </div>
+            {% endif %}
+        </div>
+        {% if not loop.last %}<div class="divider"></div>{% endif %}
+    {% endfor %}
+    </div>
+</details>
+{% endif %}
+{% endfor %}

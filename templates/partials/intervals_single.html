@@ -1,0 +1,14 @@
+<h2>{{ chord.symbol }} — Interval Analysis</h2>
+<table>
+    <thead><tr><th>Note</th><th>Semitones</th><th>Interval</th></tr></thead>
+    <tbody>
+    {% for row in intervals %}
+    <tr><td>{{ row.note }}</td><td>{{ row.semitones }}</td><td>{{ row.interval }}</td></tr>
+    {% endfor %}
+    </tbody>
+</table>
+<p class="text-muted">
+    Root: <strong>{{ chord.root }}</strong> &middot;
+    Quality: <strong>{{ chord.quality }}</strong> &middot;
+    Formula: {{ chord.interval_labels | join(' ') }}
+</p>

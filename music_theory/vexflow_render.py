@@ -1,6 +1,7 @@
 """
 Generate VexFlow HTML/JS for rendering musical score notation.
 Embeds in Streamlit via st.components.v1.html().
+VexFlow library is loaded from CDN (browser-cached after first load).
 """
 
 from typing import List
@@ -17,6 +18,8 @@ NOTE_TO_VEXFLOW = {
     'A': 'a', 'A#': 'a#', 'Bb': 'bb',
     'B': 'b',
 }
+
+_VEXFLOW_CDN = '<script src="https://cdn.jsdelivr.net/npm/vexflow@4.2.6/build/cjs/vexflow.js"></script>'
 
 
 def chord_to_vexflow_keys(chord: dict, base_octave: int = 4) -> List[str]:
@@ -55,7 +58,7 @@ def render_single_chord_html(chord: dict, width: int = 400, height: int = 250) -
 
     html = f"""
     <div id="vf-single" style="margin: 0 auto;"></div>
-    <script src="https://cdn.jsdelivr.net/npm/vexflow@4.2.2/build/cjs/vexflow.js"></script>
+    {_VEXFLOW_CDN}
     <script>
     (function() {{
         const VF = Vex.Flow;
@@ -129,7 +132,7 @@ def render_progression_html(chords: List[dict], width: int = 800, height: int = 
 
     html = f"""
     <div id="vf-progression" style="margin: 0 auto; overflow-x: auto;"></div>
-    <script src="https://cdn.jsdelivr.net/npm/vexflow@4.2.2/build/cjs/vexflow.js"></script>
+    {_VEXFLOW_CDN}
     <script>
     (function() {{
         const VF = Vex.Flow;
@@ -203,7 +206,7 @@ def render_guitar_tab_html(chords: List[dict], voicings: List[List[int]],
 
     html = f"""
     <div id="vf-tab" style="margin: 0 auto; overflow-x: auto;"></div>
-    <script src="https://cdn.jsdelivr.net/npm/vexflow@4.2.2/build/cjs/vexflow.js"></script>
+    {_VEXFLOW_CDN}
     <script>
     (function() {{
         const VF = Vex.Flow;
@@ -242,6 +245,99 @@ def render_guitar_tab_html(chords: List[dict], voicings: List[List[int]],
                 context.fillText(td.symbol, bb.getX(), 35);
             }}
         }});
+    }})();
+    </script>
+    """
+    return html
+
+
+def render_combined_score_tab_html(chords: List[dict], voicings: List[List[int]],
+                                   width: int = 800, height: int = 480) -> str:
+    """
+    Render both treble clef score AND guitar tab in a single HTML component.
+    Avoids loading VexFlow twice in the progression view.
+    """
+    if not chords or not voicings:
+        return "<p>No chords to display</p>"
+
+    # Treble clef note data
+    treble_parts = []
+    for chord in chords:
+        keys = chord_to_vexflow_keys(chord)
+        keys_js = ', '.join(f'"{k}"' for k in keys)
+        accidentals = []
+        for i, k in enumerate(keys):
+            note_part = k.split('/')[0]
+            if '#' in note_part:
+                accidentals.append(f"{{index: {i}, type: '#'}}")
+            elif 'b' in note_part:
+                accidentals.append(f"{{index: {i}, type: 'b'}}")
+        acc_js = '[' + ', '.join(accidentals) + ']'
+        treble_parts.append(f"{{keys: [{keys_js}], accidentals: {acc_js}, symbol: '{chord['symbol']}'}}")
+    treble_js = ',\n            '.join(treble_parts)
+
+    # Tab note data
+    tab_parts = []
+    for chord, voicing in zip(chords, voicings):
+        positions = []
+        for string_idx in range(6):
+            fret = voicing[string_idx]
+            if fret >= 0:
+                vex_string = 6 - string_idx
+                positions.append(f"{{str: {vex_string}, fret: {fret}}}")
+        pos_js = ', '.join(positions)
+        tab_parts.append(f"{{positions: [{pos_js}], symbol: '{chord['symbol']}'}}")
+    tab_js = ',\n            '.join(tab_parts)
+
+    stave_width = max(width - 40, len(chords) * 120)
+
+    html = f"""
+    <div id="vf-combined" style="margin: 0 auto; overflow-x: auto;"></div>
+    {_VEXFLOW_CDN}
+    <script>
+    (function() {{
+        const VF = Vex.Flow;
+        const div = document.getElementById('vf-combined');
+        const renderer = new VF.Renderer(div, VF.Renderer.Backends.SVG);
+        renderer.resize({stave_width + 40}, {height});
+        const context = renderer.getContext();
+        context.setFont('Arial', 10);
+
+        // --- Treble clef ---
+        const trebleStave = new VF.Stave(10, 40, {stave_width});
+        trebleStave.addClef('treble');
+        trebleStave.addTimeSignature('{len(chords)}/4');
+        trebleStave.setContext(context).draw();
+
+        const trebleData = [{treble_js}];
+        const trebleNotes = trebleData.map(cd => {{
+            const note = new VF.StaveNote({{keys: cd.keys, duration: 'q', clef: 'treble'}});
+            cd.accidentals.forEach(acc => {{
+                note.addModifier(new VF.Accidental(acc.type), acc.index);
+            }});
+            return note;
+        }});
+        const trebleVoice = new VF.Voice({{num_beats: {len(chords)}, beat_value: 4}});
+        trebleVoice.addTickables(trebleNotes);
+        new VF.Formatter().joinVoices([trebleVoice]).format([trebleVoice], {stave_width - 80});
+        trebleVoice.draw(context, trebleStave);
+
+        trebleData.forEach((cd, i) => {{
+            const bb = trebleNotes[i].getBoundingBox();
+            if (bb) {{ context.setFont('Arial', 11, 'bold'); context.fillText(cd.symbol, bb.getX(), 35); }}
+        }});
+
+        // --- Tab stave ---
+        const tabStave = new VF.TabStave(10, 240, {stave_width});
+        tabStave.addClef('tab');
+        tabStave.setContext(context).draw();
+
+        const tabData = [{tab_js}];
+        const tabNotes = tabData.map(td => new VF.TabNote({{positions: td.positions, duration: 'q'}}));
+        const tabVoice = new VF.Voice({{num_beats: {len(chords)}, beat_value: 4}});
+        tabVoice.addTickables(tabNotes);
+        new VF.Formatter().joinVoices([tabVoice]).format([tabVoice], {stave_width - 80});
+        tabVoice.draw(context, tabStave);
     }})();
     </script>
     """

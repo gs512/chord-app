@@ -17,7 +17,7 @@ TUNING_SEMITONES = [note_to_semitone(n) for n in TUNING_NOTES]  # [4, 9, 2, 7, 1
 # Each voicing is a list of 6 values: fret number per string, -1 = muted, 0 = open
 VOICING_DB = {
     # Major open chords
-    ('C', 'maj'):   [[(-1, 0, 3, 2, 0, 1, 0)]],
+    ('C', 'maj'):   [(-1, 3, 2, 0, 1, 0)],
     ('D', 'maj'):   [(-1, -1, 0, 2, 3, 2)],
     ('E', 'maj'):   [(0, 2, 2, 1, 0, 0)],
     ('G', 'maj'):   [(3, 2, 0, 0, 0, 3)],
@@ -287,6 +287,15 @@ def generate_all_shell_voicings(chord: dict, max_voicings: int = 8) -> List[List
     candidates.sort(key=lambda x: x[0], reverse=True)
     result = [v for _, v in candidates[:max_voicings]]
     return result if result else [generate_voicing(chord)]
+
+
+def voicing_to_midi(voicing: List[int]) -> List[int]:
+    """Convert a voicing to MIDI note numbers, skipping muted strings."""
+    midi_notes = []
+    for s, fret in enumerate(voicing):
+        if fret >= 0:
+            midi_notes.append(STANDARD_TUNING[s] + fret)
+    return midi_notes
 
 
 def voicing_to_notes(voicing: List[int]) -> List[Optional[str]]:

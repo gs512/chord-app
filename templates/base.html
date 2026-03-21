@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Chord Voicing &amp; Analysis</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <script src="https://unpkg.com/htmx.org@2.0.4"></script>
+</head>
+<body>
+    <h1>Chord Voicing &amp; Analysis</h1>
+
+    <form id="main-form" onsubmit="return false;">
+        <!-- Mode toggle -->
+        <div class="controls">
+            <div class="radio-group">
+                <input type="radio" name="app_mode" id="mode-single" value="single"
+                       {% if mode == 'single' %}checked{% endif %}
+                       hx-get="/partial/mode_form?app_mode=single"
+                       hx-target="#mode-form" hx-swap="innerHTML">
+                <label for="mode-single">Single Chord</label>
+                <input type="radio" name="app_mode" id="mode-prog" value="progression"
+                       {% if mode == 'progression' %}checked{% endif %}
+                       hx-get="/partial/mode_form?app_mode=progression"
+                       hx-target="#mode-form" hx-swap="innerHTML">
+                <label for="mode-prog">Chord Progression</label>
+            </div>
+        </div>
+
+        <div id="mode-form">
+            {% if mode == 'single' %}
+            <div class="controls">
+                <label for="chord">Chord:</label>
+                <input type="text" name="chord" id="chord" value="{{ chord_input }}"
+                       placeholder="e.g. Cmaj7, Dm7b5, G7#9"
+                       hx-get="/partial/single_content" hx-trigger="keyup changed delay:400ms"
+                       hx-target="#content" hx-include="[name='single_view']">
+            </div>
+            <div class="controls">
+                <div class="radio-group">
+                    {% for v in ['Guitar','Keyboard','Intervals','Substitutions','Scales'] %}
+                    <input type="radio" name="single_view" id="sv-{{ v|lower }}" value="{{ v|lower }}"
+                           {% if single_view == v|lower %}checked{% endif %}
+                           hx-get="/partial/single_content" hx-target="#content"
+                           hx-include="[name='chord']">
+                    <label for="sv-{{ v|lower }}">{{ v }}</label>
+                    {% endfor %}
+                </div>
+                <span class="htmx-indicator text-muted">Loading...</span>
+            </div>
+            {% else %}
+            <div class="controls">
+                <label for="prog_input">Progression:</label>
+                <input type="text" name="prog_input" id="prog_input" value="{{ prog_input }}"
+                       placeholder="e.g. Dm7 | G7 | Cmaj7 | Am7"
+                       hx-get="/partial/prog_content" hx-trigger="keyup changed delay:400ms"
+                       hx-target="#content" hx-include="[name='prog_view'],[name='sel_key'],[name='sel_mode']">
+            </div>
+            <div class="controls">
+                <label for="sel_key">Key:</label>
+                <select name="sel_key" id="sel_key"
+                        hx-get="/partial/prog_content" hx-target="#content"
+                        hx-include="[name='prog_input'],[name='prog_view'],[name='sel_mode']">
+                    <option value="Auto" {% if sel_key == 'Auto' %}selected{% endif %}>Auto</option>
+                    {% for n in all_keys %}
+                    <option value="{{ n }}" {% if sel_key == n %}selected{% endif %}>{{ n }}</option>
+                    {% endfor %}
+                </select>
+                <label for="sel_mode">Mode:</label>
+                <select name="sel_mode" id="sel_mode"
+                        hx-get="/partial/prog_content" hx-target="#content"
+                        hx-include="[name='prog_input'],[name='prog_view'],[name='sel_key']">
+                    {% for m in ['Auto','major','minor'] %}
+                    <option value="{{ m }}" {% if sel_mode == m %}selected{% endif %}>{{ m }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="controls">
+                <div class="radio-group">
+                    {% for v in ['Guitar','Keyboard','Intervals','Diatonic','Substitutions','Scales'] %}
+                    <input type="radio" name="prog_view" id="pv-{{ v|lower }}" value="{{ v|lower }}"
+                           {% if prog_view == v|lower %}checked{% endif %}
+                           hx-get="/partial/prog_content" hx-target="#content"
+                           hx-include="[name='prog_input'],[name='sel_key'],[name='sel_mode']">
+                    <label for="pv-{{ v|lower }}">{{ v }}</label>
+                    {% endfor %}
+                </div>
+                <span class="htmx-indicator text-muted">Loading...</span>
+            </div>
+            {% endif %}
+        </div>
+    </form>
+
+    <div id="content">
+        {{ content | safe }}
+    </div>
+
+    <!-- Shared audio engine — no iframes needed -->
+    <script>
+    function playNotes(notes, strum) {
+        var AC = window.AudioContext || window.webkitAudioContext;
+        var ctx = new AC();
+        ctx.resume().then(function() {
+            var g = 0.25 / Math.max(notes.length, 1);
+            var sd = strum ? 0.04 : 0;
+            notes.forEach(function(midi, i) {
+                var freq = 440 * Math.pow(2, (midi - 69) / 12);
+                var t = ctx.currentTime + i * sd;
+                var o1 = ctx.createOscillator();
+                var o2 = ctx.createOscillator();
+                var gn = ctx.createGain();
+                o1.type = 'triangle'; o2.type = 'sine';
+                o1.frequency.value = freq; o2.frequency.value = freq * 2;
+                o1.connect(gn); o2.connect(gn); gn.connect(ctx.destination);
+                gn.gain.setValueAtTime(0, t);
+                gn.gain.linearRampToValueAtTime(g, t + 0.02);
+                gn.gain.linearRampToValueAtTime(g * 0.7, t + 0.15);
+                gn.gain.setValueAtTime(g * 0.7, t + 0.8);
+                gn.gain.linearRampToValueAtTime(0, t + 1.8);
+                var gn2 = ctx.createGain();
+                o2.disconnect(); o2.connect(gn2); gn2.connect(ctx.destination);
+                gn2.gain.setValueAtTime(0, t);
+                gn2.gain.linearRampToValueAtTime(g * 0.15, t + 0.02);
+                gn2.gain.linearRampToValueAtTime(0, t + 1.2);
+                o1.start(t); o2.start(t);
+                o1.stop(t + 2.0); o2.stop(t + 1.5);
+            });
+        });
+    }
+    </script>
+</body>
+</html>

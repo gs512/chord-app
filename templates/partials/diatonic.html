@@ -1,0 +1,56 @@
+<h2>Circle of Fifths</h2>
+<div class="two-col">
+    <div><img src="{{ cof_img }}" alt="Circle of Fifths" style="width:100%"></div>
+    <div>
+        <p><strong>Detected key:</strong> {{ key }} {{ mode }}</p>
+        <p class="text-muted">The highlighted segment shows the current key.
+        Major keys on the outer ring, relative minors on the inner ring.</p>
+    </div>
+</div>
+
+<h2>Diatonic Chords in {{ key }} {{ mode }}</h2>
+
+<div class="controls">
+    <div class="radio-group">
+        {% for label, val in [('Triads','triads'),('7th','7th'),('9th','9th'),('Sus4','sus4'),('Sus2','sus2'),('Add9','add9'),('6th','6th')] %}
+        <input type="radio" name="chord_type" id="ct-{{ val }}" value="{{ val }}"
+               {% if chord_type == val %}checked{% endif %}
+               hx-get="/partial/prog_content" hx-target="#content"
+               hx-include="[name='prog_input'],[name='sel_key'],[name='sel_mode'],[name='prog_view']"
+               hx-vals='{"chord_type":"{{ val }}"}'>
+        <label for="ct-{{ val }}">{{ label }}</label>
+        {% endfor %}
+    </div>
+</div>
+
+<table>
+    <thead><tr><th>Numeral</th><th>Chord</th><th>Notes</th><th>Quality</th></tr></thead>
+    <tbody>
+    {% for d in diatonic %}
+    <tr><td>{{ d.numeral }}</td><td>{{ d.symbol }}</td><td>{{ d.notes }}</td><td>{{ d.quality }}</td></tr>
+    {% endfor %}
+    </tbody>
+</table>
+
+{% if chromatic %}
+<p class="alert alert-warning">Non-diatonic chords: {{ chromatic | join(', ') }}</p>
+{% else %}
+<p class="alert alert-success">All chords are diatonic to the key.</p>
+{% endif %}
+
+<h3>Diatonic Chord Voicings</h3>
+<div class="chord-grid cols-{{ [diatonic|length, 4] | min }}">
+{% for d in diatonic %}
+{% if d.gv is defined and d.gv %}
+<div class="chord-card">
+    <h4>{{ d.numeral }} — {{ d.symbol }}</h4>
+    {% set v = d.gv %}
+    {% set vtype = "guitar" %}
+    {% include "partials/_voicing_guitar.html" %}
+    {% set v = d.kv %}
+    {% set vtype = "keyboard" %}
+    {% include "partials/_voicing_keyboard.html" %}
+</div>
+{% endif %}
+{% endfor %}
+</div>
