@@ -17,7 +17,7 @@ TUNING_SEMITONES = [note_to_semitone(n) for n in TUNING_NOTES]  # [4, 9, 2, 7, 1
 # Each voicing is a list of 6 values: fret number per string, -1 = muted, 0 = open
 VOICING_DB = {
     # Major open chords
-    ('C', 'maj'):   [[(-1, 0, 3, 2, 0, 1, 0)]],
+    ('C', 'maj'):   [(-1, 3, 2, 0, 1, 0)],
     ('D', 'maj'):   [(-1, -1, 0, 2, 3, 2)],
     ('E', 'maj'):   [(0, 2, 2, 1, 0, 0)],
     ('G', 'maj'):   [(3, 2, 0, 0, 0, 3)],
