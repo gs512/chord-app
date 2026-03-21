@@ -34,6 +34,72 @@ st.set_page_config(page_title="Chord Voicing & Analysis", layout="wide")
 
 st.title("Chord Voicing & Analysis")
 
+
+def _nav_buttons(state_key, count, labels=None, compact=False):
+    """Render prev/next navigation buttons. Returns current index."""
+    if state_key not in st.session_state:
+        st.session_state[state_key] = 0
+    idx = min(st.session_state[state_key], count - 1)
+    st.session_state[state_key] = idx
+
+    if count <= 1:
+        if labels and labels[0]:
+            st.caption(labels[0])
+        return 0
+
+    if compact:
+        c1, c2, c3 = st.columns([1, 2, 1])
+    else:
+        c1, c2, c3 = st.columns([1, 3, 1])
+
+    with c1:
+        if st.button("\u25c0", key=f"{state_key}_prev", disabled=(idx <= 0)):
+            st.session_state[state_key] = idx - 1
+            st.rerun()
+    with c2:
+        label = labels[idx] if labels else f"{idx+1}/{count}"
+        st.markdown(f"<div style='text-align:center;font-size:{'0.8em' if compact else '1em'};padding-top:6px'>{label}</div>", unsafe_allow_html=True)
+    with c3:
+        if st.button("\u25b6", key=f"{state_key}_next", disabled=(idx >= count - 1)):
+            st.session_state[state_key] = idx + 1
+            st.rerun()
+    return idx
+
+
+def render_guitar_nav(chord, key_prefix, compact=False):
+    """Render a guitar fretboard with voicing navigation arrows."""
+    all_v = generate_all_voicings(chord)
+    labels = [f"Voicing {i+1}/{len(all_v)}" for i in range(len(all_v))]
+    idx = _nav_buttons(f"gv_{key_prefix}", len(all_v), labels, compact=compact)
+    voicing = all_v[idx]
+    fig = render_fretboard(chord, voicing)
+    st.pyplot(fig, use_container_width=False)
+    if not compact:
+        tab_text = voicing_to_tab(chord['symbol'], voicing)
+        st.code(tab_text, language=None)
+    notes = voicing_to_notes(voicing)
+    notes_display = [n if n else 'X' for n in notes]
+    st.caption(f"Notes: {' '.join(notes_display)}")
+    plt.close('all')
+    return voicing
+
+
+def render_keyboard_nav(chord, key_prefix, compact=False, figsize=(6, 2.5)):
+    """Render a piano keyboard with inversion navigation arrows."""
+    inversions = generate_keyboard_inversions(chord)
+    _suffixes = {1: "st", 2: "nd", 3: "rd"}
+    labels = ["Root Position"] + [
+        f"{i}{_suffixes.get(i, 'th')} Inv." for i in range(1, len(inversions))
+    ]
+    idx = _nav_buttons(f"ki_{key_prefix}", len(inversions), labels, compact=compact)
+    kb_voicing = inversions[idx]
+    fig = render_piano(chord, voicing=kb_voicing, figsize=figsize)
+    st.pyplot(fig, use_container_width=not compact)
+    notes_str = ', '.join(f"{n}{o}" for n, o, _ in kb_voicing)
+    st.caption(f"{notes_str}")
+    plt.close('all')
+    return kb_voicing
+
 # --- Input Section ---
 input_mode = st.radio("Mode", ["Single Chord", "Chord Progression"], horizontal=True)
 
@@ -60,43 +126,8 @@ if input_mode == "Single Chord":
         )
 
         with tab_guitar:
-            all_voicings = generate_all_voicings(chord)
-            num_voicings = len(all_voicings)
-
-            # Session state for guitar voicing index
-            gv_key = f"guitar_voicing_{chord_input}"
-            if gv_key not in st.session_state:
-                st.session_state[gv_key] = 0
-
             st.subheader("Full Voicing")
-            nav_left, nav_label, nav_right = st.columns([1, 3, 1])
-            with nav_left:
-                if st.button("\u25c0 Prev", key="gv_prev", disabled=(st.session_state[gv_key] <= 0)):
-                    st.session_state[gv_key] -= 1
-                    st.rerun()
-            with nav_label:
-                st.markdown(
-                    f"<div style='text-align:center; padding-top:6px;'>Voicing {st.session_state[gv_key]+1} of {num_voicings}</div>",
-                    unsafe_allow_html=True
-                )
-            with nav_right:
-                if st.button("Next \u25b6", key="gv_next", disabled=(st.session_state[gv_key] >= num_voicings - 1)):
-                    st.session_state[gv_key] += 1
-                    st.rerun()
-
-            idx = min(st.session_state[gv_key], num_voicings - 1)
-            voicing = all_voicings[idx]
-
-            col1, col2 = st.columns([1, 2])
-            with col1:
-                fig = render_fretboard(chord, voicing)
-                st.pyplot(fig, use_container_width=False)
-            with col2:
-                tab_text = voicing_to_tab(chord['symbol'], voicing)
-                st.code(tab_text, language=None)
-                notes = voicing_to_notes(voicing)
-                notes_display = [n if n else 'X' for n in notes]
-                st.caption(f"Notes: {' '.join(notes_display)}")
+            voicing = render_guitar_nav(chord, f"single_{chord_input}")
 
             shell = generate_shell_voicing(chord)
             st.subheader("Shell Voicing (Root + 3rd + 7th)")
@@ -112,47 +143,8 @@ if input_mode == "Single Chord":
                 st.caption(f"Notes: {' '.join(shell_display)}")
 
         with tab_keyboard:
-            inversions = generate_keyboard_inversions(chord)
-            num_inversions = len(inversions)
-            _suffixes = {1: "st", 2: "nd", 3: "rd"}
-            inversion_names = ["Root Position"] + [
-                f"{i}{_suffixes.get(i, 'th')} Inversion" for i in range(1, num_inversions)
-            ]
-
-            # Session state for keyboard inversion index
-            ki_key = f"kb_inversion_{chord_input}"
-            if ki_key not in st.session_state:
-                st.session_state[ki_key] = 0
-
             st.subheader("Full Voicing")
-            nav_left, nav_label, nav_right = st.columns([1, 3, 1])
-            with nav_left:
-                if st.button("\u25c0 Prev", key="ki_prev", disabled=(st.session_state[ki_key] <= 0)):
-                    st.session_state[ki_key] -= 1
-                    st.rerun()
-            with nav_label:
-                inv_idx = min(st.session_state[ki_key], num_inversions - 1)
-                inv_name = inversion_names[inv_idx]
-                st.markdown(
-                    f"<div style='text-align:center; padding-top:6px;'>{inv_name} ({inv_idx+1} of {num_inversions})</div>",
-                    unsafe_allow_html=True
-                )
-            with nav_right:
-                if st.button("Next \u25b6", key="ki_next", disabled=(st.session_state[ki_key] >= num_inversions - 1)):
-                    st.session_state[ki_key] += 1
-                    st.rerun()
-
-            inv_idx = min(st.session_state[ki_key], num_inversions - 1)
-            kb_voicing = inversions[inv_idx]
-
-            col1, col2 = st.columns([2, 1])
-            with col1:
-                fig = render_piano(chord, voicing=kb_voicing)
-                st.pyplot(fig, use_container_width=False)
-            with col2:
-                notes_str = ', '.join(f"{n}{o}" for n, o, _ in kb_voicing)
-                st.code(f"{chord['symbol']}: {notes_str}", language=None)
-                st.caption(f"Notes: {notes_str}")
+            render_keyboard_nav(chord, f"single_{chord_input}")
 
             st.subheader("Shell Voicing (Root + 3rd + 7th)")
             shell_kb = generate_shell_keyboard_voicing(chord)
@@ -184,22 +176,17 @@ if input_mode == "Single Chord":
             st.subheader("Chord Substitutions")
             subs = suggest_substitutions(chord)
             if subs:
-                for s in subs:
-                    # Extract the first chord symbol (handle "Cm7 → G7" style)
-                    sub_sym = s['symbol'].split('→')[0].strip().split(' ')[0].strip()
+                for si, s in enumerate(subs):
+                    sub_sym = s['symbol'].split('\u2192')[0].strip().split(' ')[0].strip()
                     with st.expander(f"{s['type']}: {s['symbol']}", expanded=True):
                         st.caption(s['reason'])
                         try:
                             sub_chord = parse_chord(sub_sym)
-                            sub_v = generate_voicing(sub_chord)
                             col_g, col_k = st.columns(2)
                             with col_g:
-                                fig = render_fretboard(sub_chord, sub_v)
-                                st.pyplot(fig, use_container_width=False)
+                                render_guitar_nav(sub_chord, f"sub_{chord_input}_{si}", compact=True)
                             with col_k:
-                                fig = render_piano(sub_chord)
-                                st.pyplot(fig, use_container_width=False)
-                            plt.close('all')
+                                render_keyboard_nav(sub_chord, f"sub_kb_{chord_input}_{si}", compact=True)
                         except ValueError:
                             pass
             else:
@@ -280,13 +267,13 @@ else:
         )
 
         with tab_guitar:
-            # Fretboard diagrams in columns
-            voicings = [generate_voicing(c) for c in chords]
+            # Fretboard diagrams in columns with voicing navigation
             cols = st.columns(min(len(chords), 4))
-            for i, (chord, voicing) in enumerate(zip(chords, voicings)):
+            prog_voicings = []
+            for i, chord in enumerate(chords):
                 with cols[i % len(cols)]:
-                    fig = render_fretboard(chord, voicing)
-                    st.pyplot(fig, use_container_width=False)
+                    v = render_guitar_nav(chord, f"prog_g_{i}_{chord['symbol']}", compact=True)
+                    prog_voicings.append(v)
 
             st.subheader("Combined Tablature")
             tab_text = get_guitar_tab_for_progression(chords)
@@ -294,16 +281,14 @@ else:
 
             # VexFlow guitar tab
             st.subheader("Guitar Tab (Notation)")
-            tab_html = render_guitar_tab_html(chords, voicings)
+            tab_html = render_guitar_tab_html(chords, prog_voicings)
             components.html(tab_html, height=280, scrolling=True)
 
         with tab_keyboard:
             cols = st.columns(min(len(chords), 4))
             for i, chord in enumerate(chords):
                 with cols[i % len(cols)]:
-                    fig = render_piano(chord)
-                    st.pyplot(fig, use_container_width=False)
-                    st.caption(voicing_to_text(chord))
+                    render_keyboard_nav(chord, f"prog_k_{i}_{chord['symbol']}", compact=True, figsize=(4, 1.5))
 
         with tab_score:
             st.subheader("Musical Score")
@@ -365,37 +350,29 @@ else:
                 with cols[i % len(cols)]:
                     try:
                         dc = parse_chord(d['symbol'])
-                        dv = generate_voicing(dc)
                         st.markdown(f"**{d['numeral']}** — {d['symbol']}")
-                        fig = render_fretboard(dc, dv)
-                        st.pyplot(fig, use_container_width=False)
-                        fig = render_piano(dc, figsize=(4, 1.5))
-                        st.pyplot(fig, use_container_width=True)
-                        plt.close('all')
+                        render_guitar_nav(dc, f"dia_g_{i}_{d['symbol']}", compact=True)
+                        render_keyboard_nav(dc, f"dia_k_{i}_{d['symbol']}", compact=True, figsize=(4, 1.5))
                     except ValueError:
                         st.caption(d['symbol'])
 
         with tab_subs:
             st.subheader("Substitution Suggestions")
-            for chord in chords:
+            for ci, chord in enumerate(chords):
                 subs = suggest_substitutions(chord, key, mode)
                 if subs:
                     with st.expander(f"{chord['symbol']}", expanded=True):
-                        for s in subs:
-                            sub_sym = s['symbol'].split('→')[0].strip().split(' ')[0].strip()
+                        for si, s in enumerate(subs):
+                            sub_sym = s['symbol'].split('\u2192')[0].strip().split(' ')[0].strip()
                             st.markdown(f"**{s['type']}:** `{s['symbol']}`")
                             st.caption(s['reason'])
                             try:
                                 sub_chord = parse_chord(sub_sym)
-                                sub_v = generate_voicing(sub_chord)
                                 col_g, col_k = st.columns(2)
                                 with col_g:
-                                    fig = render_fretboard(sub_chord, sub_v)
-                                    st.pyplot(fig, use_container_width=False)
+                                    render_guitar_nav(sub_chord, f"psub_g_{ci}_{si}_{sub_sym}", compact=True)
                                 with col_k:
-                                    fig = render_piano(sub_chord, figsize=(4, 1.5))
-                                    st.pyplot(fig, use_container_width=True)
-                                plt.close('all')
+                                    render_keyboard_nav(sub_chord, f"psub_k_{ci}_{si}_{sub_sym}", compact=True, figsize=(4, 1.5))
                             except ValueError:
                                 pass
 
