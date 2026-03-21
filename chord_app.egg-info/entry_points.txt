@@ -1,2 +1,0 @@
-[console_scripts]
-chord-app = streamlit.web.cli:main
