@@ -1,0 +1,58 @@
+{% if mode == 'single' %}
+<div class="controls">
+    <label for="chord">Chord:</label>
+    <input type="text" name="chord" id="chord" value="{{ chord_input }}"
+           placeholder="e.g. Cmaj7, Dm7b5, G7#9"
+           hx-get="/partial/single_content" hx-trigger="keyup changed delay:400ms"
+           hx-target="#content" hx-include="[name='single_view']">
+</div>
+<div class="controls">
+    <div class="radio-group">
+        {% for v in ['Guitar','Keyboard','Intervals','Substitutions','Scales'] %}
+        <input type="radio" name="single_view" id="sv-{{ v|lower }}" value="{{ v|lower }}"
+               {% if single_view == v|lower %}checked{% endif %}
+               hx-get="/partial/single_content" hx-target="#content"
+               hx-include="[name='chord']">
+        <label for="sv-{{ v|lower }}">{{ v }}</label>
+        {% endfor %}
+    </div>
+</div>
+{% else %}
+<div class="controls">
+    <label for="prog_input">Progression:</label>
+    <input type="text" name="prog_input" id="prog_input" value="{{ prog_input }}"
+           placeholder="e.g. Dm7 | G7 | Cmaj7 | Am7"
+           hx-get="/partial/prog_content" hx-trigger="keyup changed delay:400ms"
+           hx-target="#content" hx-include="[name='prog_view'],[name='sel_key'],[name='sel_mode']">
+</div>
+<div class="controls">
+    <label for="sel_key">Key:</label>
+    <select name="sel_key" id="sel_key"
+            hx-get="/partial/prog_content" hx-target="#content"
+            hx-include="[name='prog_input'],[name='prog_view'],[name='sel_mode']">
+        <option value="Auto" {% if sel_key == 'Auto' %}selected{% endif %}>Auto</option>
+        {% for n in all_keys %}
+        <option value="{{ n }}" {% if sel_key == n %}selected{% endif %}>{{ n }}</option>
+        {% endfor %}
+    </select>
+    <label for="sel_mode">Mode:</label>
+    <select name="sel_mode" id="sel_mode"
+            hx-get="/partial/prog_content" hx-target="#content"
+            hx-include="[name='prog_input'],[name='prog_view'],[name='sel_key']">
+        {% for m in ['Auto','major','minor'] %}
+        <option value="{{ m }}" {% if sel_mode == m %}selected{% endif %}>{{ m }}</option>
+        {% endfor %}
+    </select>
+</div>
+<div class="controls">
+    <div class="radio-group">
+        {% for v in ['Guitar','Keyboard','Intervals','Diatonic','Substitutions','Scales'] %}
+        <input type="radio" name="prog_view" id="pv-{{ v|lower }}" value="{{ v|lower }}"
+               {% if prog_view == v|lower %}checked{% endif %}
+               hx-get="/partial/prog_content" hx-target="#content"
+               hx-include="[name='prog_input'],[name='sel_key'],[name='sel_mode']">
+        <label for="pv-{{ v|lower }}">{{ v }}</label>
+        {% endfor %}
+    </div>
+</div>
+{% endif %}

@@ -1,0 +1,47 @@
+<h2>Chord Interval Analysis</h2>
+{% for chord, intervals in chord_intervals %}
+<details {% if loop.index <= 2 %}open{% endif %}>
+    <summary>{{ chord.symbol }}</summary>
+    <div class="detail-body">
+        <table>
+            <thead><tr><th>Note</th><th>Semitones</th><th>Interval</th></tr></thead>
+            <tbody>
+            {% for row in intervals %}
+            <tr><td>{{ row.note }}</td><td>{{ row.semitones }}</td><td>{{ row.interval }}</td></tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</details>
+{% endfor %}
+
+<h2>Roman Numeral Analysis</h2>
+<table>
+    <thead><tr><th>Chord</th><th>Roman Numeral</th><th>Scale Degree</th></tr></thead>
+    <tbody>
+    {% for r in roman %}
+    <tr><td>{{ r.symbol }}</td><td>{{ r.roman }}</td><td>{{ r.degree }}</td></tr>
+    {% endfor %}
+    </tbody>
+</table>
+
+{% if movements %}
+<h2>Root Movement</h2>
+<table>
+    <thead><tr><th>From</th><th>To</th><th>Movement</th><th>Semitones</th></tr></thead>
+    <tbody>
+    {% for m in movements %}
+    <tr><td>{{ m['from'] }}</td><td>{{ m.to }}</td><td>{{ m.description }}</td><td>{{ m.semitones }}</td></tr>
+    {% endfor %}
+    </tbody>
+</table>
+{% endif %}
+
+<h2>Pattern Recognition</h2>
+{% if patterns %}
+{% for p in patterns %}
+<p class="alert alert-success">Detected: <strong>{{ p }}</strong></p>
+{% endfor %}
+{% else %}
+<p class="alert alert-info">No common patterns detected in this progression.</p>
+{% endif %}

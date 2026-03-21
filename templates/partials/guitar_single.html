@@ -1,0 +1,10 @@
+<h2>{{ chord.symbol }} — Full Voicing</h2>
+{% set v = gv %}
+{% set vtype = "guitar" %}
+{% include "partials/_voicing_guitar.html" %}
+<pre class="tab-text">{{ gv.tab }}</pre>
+
+<h2>Shell Voicing (Root + 3rd + 7th)</h2>
+{% set v = sgv %}
+{% set vtype = "shell_guitar" %}
+{% include "partials/_voicing_guitar.html" %}

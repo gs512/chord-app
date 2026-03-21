@@ -1,0 +1,17 @@
+<h2>Scale Suggestions per Chord</h2>
+{% for chord, scales in chord_scales %}
+{% if scales %}
+<details>
+    <summary>{{ chord.symbol }}</summary>
+    <div class="detail-body">
+    {% for s in scales[:3] %}
+        <p><strong>{{ s.scale }}</strong>
+        ({% if s.reason.startswith('Primary') %}Primary{% else %}Compatible{% endif %})</p>
+        <pre class="tab-text">{{ s.notes }}</pre>
+        <p class="text-muted">{{ s.reason }}</p>
+        {% if not loop.last %}<div class="divider"></div>{% endif %}
+    {% endfor %}
+    </div>
+</details>
+{% endif %}
+{% endfor %}

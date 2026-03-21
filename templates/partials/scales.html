@@ -1,0 +1,14 @@
+<h2>{{ chord.symbol }} — Scales for Improvisation</h2>
+{% if scales %}
+{% for s in scales %}
+<details {% if loop.index <= 3 %}open{% endif %}>
+    <summary>{{ s.scale }} ({% if s.reason.startswith('Primary') %}Primary{% else %}Compatible{% endif %})</summary>
+    <div class="detail-body">
+        <pre class="tab-text">{{ s.notes }}</pre>
+        <p class="text-muted">{{ s.reason }}</p>
+    </div>
+</details>
+{% endfor %}
+{% else %}
+<p class="alert alert-info">No scale suggestions available.</p>
+{% endif %}

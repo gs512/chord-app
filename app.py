@@ -569,3 +569,5 @@ else:
                                             img = _fig_to_cached_png(sk, lambda: render_scale_piano(
                                                 s_name, s_root, SCALES[s_name], use_flats=_uf))
                                             st.image(img, width='stretch')
+
+_trace('script done')
