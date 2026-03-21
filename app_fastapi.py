@@ -16,7 +16,7 @@ import time
 from functools import lru_cache
 from pathlib import Path
 
-from fastapi import FastAPI, Query, Request
+from fastapi import FastAPI, Request
 from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
@@ -36,9 +36,6 @@ from music_theory.intervals import (
     root_movement_analysis, detect_patterns,
     get_diatonic_chords, suggest_substitutions, suggest_scales, SCALES,
     render_circle_of_fifths
-)
-from music_theory.voice_leading import (
-    optimize_guitar_voice_leading, optimize_keyboard_voice_leading
 )
 
 # --- Logging ---
@@ -65,7 +62,6 @@ CT_MAP = {
     "triads": "triad", "7th": "7th", "9th": "9th",
     "sus4": "sus4", "sus2": "sus2", "add9": "add9", "6th": "6th",
 }
-
 
 # --- PNG cache ---
 
@@ -111,68 +107,68 @@ def _safe_id(symbol):
     return symbol.replace('#', 'sharp').replace('/', 'over')
 
 
-def _guitar_voicing_data(chord, voicing_idx=0):
-    all_v = _cached_all_voicings(chord['symbol'])
+def _guitar_voicing_data(chord, voicing_idx=0, *, shell=False):
+    cache_fn = _cached_all_shell_voicings if shell else _cached_all_voicings
+    prefix = 'shell' if shell else 'fret'
+    label_prefix = 'Shell' if shell else 'Voicing'
+
+    all_v = cache_fn(chord['symbol'])
     idx = min(voicing_idx, len(all_v) - 1)
     v = all_v[idx]
-    ck = _chart_key('fret', chord['symbol'], tuple(v))
+    ck = _chart_key(prefix, chord['symbol'], tuple(v))
     img = _fig_to_cached_png(ck, lambda: render_fretboard(chord, v))
-    notes = voicing_to_notes(v)
-    midi = voicing_to_midi(v)
-    tab = voicing_to_tab(chord['symbol'], v)
+    tab_sym = chord['symbol'] + (' (shell)' if shell else '')
     return {
-        'img': img, 'notes': [n or 'X' for n in notes], 'midi': midi,
-        'tab': tab, 'idx': idx, 'total': len(all_v),
-        'label': f"Voicing {idx+1}/{len(all_v)}",
+        'img': img, 'notes': [n or 'X' for n in voicing_to_notes(v)],
+        'midi': voicing_to_midi(v), 'tab': voicing_to_tab(tab_sym, v),
+        'idx': idx, 'total': len(all_v),
+        'label': f"{label_prefix} {idx+1}/{len(all_v)}",
         'symbol': chord['symbol'], 'safe_id': _safe_id(chord['symbol']),
     }
 
 
-def _shell_guitar_data(chord, voicing_idx=0):
-    all_v = _cached_all_shell_voicings(chord['symbol'])
-    idx = min(voicing_idx, len(all_v) - 1)
-    v = all_v[idx]
-    ck = _chart_key('shell', chord['symbol'], tuple(v))
-    img = _fig_to_cached_png(ck, lambda: render_fretboard(chord, v))
-    notes = voicing_to_notes(v)
-    midi = voicing_to_midi(v)
-    tab = voicing_to_tab(chord['symbol'] + ' (shell)', v)
-    return {
-        'img': img, 'notes': [n or 'X' for n in notes], 'midi': midi,
-        'tab': tab, 'idx': idx, 'total': len(all_v),
-        'label': f"Shell {idx+1}/{len(all_v)}",
-        'symbol': chord['symbol'], 'safe_id': _safe_id(chord['symbol']),
-    }
+def _keyboard_voicing_data(chord, inversion_idx=0, figsize=(6, 2.5), *, shell=False):
+    cache_fn = _cached_shell_keyboard_inversions if shell else _cached_keyboard_inversions
+    prefix = 'shellpiano' if shell else 'piano'
 
-
-def _keyboard_voicing_data(chord, inversion_idx=0, figsize=(6, 2.5)):
-    inversions = _cached_keyboard_inversions(chord['symbol'])
+    inversions = cache_fn(chord['symbol'])
     idx = min(inversion_idx, len(inversions) - 1)
     kb = inversions[idx]
-    ck = _chart_key('piano', chord['symbol'], tuple(tuple(v) for v in kb), figsize)
+    ck = _chart_key(prefix, chord['symbol'], tuple(tuple(v) for v in kb), figsize)
     img = _fig_to_cached_png(ck, lambda: render_piano(chord, voicing=kb, figsize=figsize))
-    midi = [m for _, _, m in kb]
     labels = ["Root Position"] + [f"{i}{INV_SUFFIXES.get(i, 'th')} Inv." for i in range(1, len(inversions))]
     return {
         'img': img, 'notes_str': ', '.join(f"{n}{o}" for n, o, _ in kb),
-        'midi': midi, 'idx': idx, 'total': len(inversions),
+        'midi': [m for _, _, m in kb], 'idx': idx, 'total': len(inversions),
         'label': labels[idx], 'symbol': chord['symbol'], 'safe_id': _safe_id(chord['symbol']),
     }
 
 
-def _shell_keyboard_data(chord, inversion_idx=0, figsize=(6, 2.5)):
-    inversions = _cached_shell_keyboard_inversions(chord['symbol'])
-    idx = min(inversion_idx, len(inversions) - 1)
-    kb = inversions[idx]
-    ck = _chart_key('shellpiano', chord['symbol'], tuple(tuple(v) for v in kb), figsize)
-    img = _fig_to_cached_png(ck, lambda: render_piano(chord, voicing=kb, figsize=figsize))
-    midi = [m for _, _, m in kb]
-    labels = ["Root Position"] + [f"{i}{INV_SUFFIXES.get(i, 'th')} Inv." for i in range(1, len(inversions))]
-    return {
-        'img': img, 'notes_str': ', '.join(f"{n}{o}" for n, o, _ in kb),
-        'midi': midi, 'idx': idx, 'total': len(inversions),
-        'label': labels[idx], 'symbol': chord['symbol'], 'safe_id': _safe_id(chord['symbol']),
-    }
+def _enrich_subs(subs, chord=None):
+    """Add guitar/keyboard voicing data to substitution dicts."""
+    for s in subs:
+        sub_sym = s['symbol'].split('\u2192')[0].strip().split(' ')[0].strip()
+        try:
+            sub_c = parse_chord(sub_sym)
+            s['gv'] = _guitar_voicing_data(sub_c)
+            s['kv'] = _keyboard_voicing_data(sub_c, figsize=(4, 1.5))
+        except ValueError:
+            pass
+
+
+def _enrich_scales(scales, use_flats):
+    """Add fretboard/piano diagram URLs to scale dicts."""
+    for s in scales:
+        parts = s['scale'].split(' ', 1)
+        if len(parts) == 2:
+            s_root, s_name = parts
+            if s_name in SCALES:
+                sk = _chart_key('scalefret', s_name, s_root, use_flats)
+                s['fret_img'] = _fig_to_cached_png(sk, lambda s_name=s_name, s_root=s_root, uf=use_flats:
+                    render_scale_fretboard(s_name, s_root, SCALES[s_name], use_flats=uf))
+                sk = _chart_key('scalepiano', s_name, s_root, use_flats)
+                s['piano_img'] = _fig_to_cached_png(sk, lambda s_name=s_name, s_root=s_root, uf=use_flats:
+                    render_scale_piano(s_name, s_root, SCALES[s_name], use_flats=uf))
 
 
 def _parse_prog_params(prog_input, sel_key, sel_mode):
@@ -197,7 +193,7 @@ async def index(request: Request):
     try:
         chord = parse_chord(chord_input)
         gv = _guitar_voicing_data(chord)
-        sgv = _shell_guitar_data(chord)
+        sgv = _guitar_voicing_data(chord, shell=True)
         content = templates.get_template("partials/guitar_single.html").render(
             chord=chord, gv=gv, sgv=sgv)
     except ValueError:
@@ -241,41 +237,23 @@ async def single_content(request: Request,
 
     if single_view == "guitar":
         ctx['gv'] = _guitar_voicing_data(c, voicing_idx)
-        ctx['sgv'] = _shell_guitar_data(c, shell_voicing_idx)
+        ctx['sgv'] = _guitar_voicing_data(c, shell_voicing_idx, shell=True)
         tpl = "partials/guitar_single.html"
     elif single_view == "keyboard":
         ctx['kv'] = _keyboard_voicing_data(c, inversion_idx)
-        ctx['skv'] = _shell_keyboard_data(c, shell_inversion_idx)
+        ctx['skv'] = _keyboard_voicing_data(c, shell_inversion_idx, shell=True)
         tpl = "partials/keyboard_single.html"
     elif single_view == "intervals":
         ctx['intervals'] = analyze_chord_intervals(c)
         tpl = "partials/intervals_single.html"
     elif single_view == "substitutions":
         subs = suggest_substitutions(c)
-        for s in subs:
-            sub_sym = s['symbol'].split('\u2192')[0].strip().split(' ')[0].strip()
-            try:
-                sub_c = parse_chord(sub_sym)
-                s['gv'] = _guitar_voicing_data(sub_c)
-                s['kv'] = _keyboard_voicing_data(sub_c, figsize=(4, 1.5))
-            except ValueError:
-                pass
+        _enrich_subs(subs)
         ctx['subs'] = subs
         tpl = "partials/substitutions.html"
     elif single_view == "scales":
         scales = suggest_scales(c)
-        for s in scales:
-            parts = s['scale'].split(' ', 1)
-            if len(parts) == 2:
-                s_root, s_name = parts
-                if s_name in SCALES:
-                    uf = c['use_flats']
-                    sk = _chart_key('scalefret', s_name, s_root, uf)
-                    s['fret_img'] = _fig_to_cached_png(sk, lambda s_name=s_name, s_root=s_root, uf=uf:
-                        render_scale_fretboard(s_name, s_root, SCALES[s_name], use_flats=uf))
-                    sk = _chart_key('scalepiano', s_name, s_root, uf)
-                    s['piano_img'] = _fig_to_cached_png(sk, lambda s_name=s_name, s_root=s_root, uf=uf:
-                        render_scale_piano(s_name, s_root, SCALES[s_name], use_flats=uf))
+        _enrich_scales(scales, c['use_flats'])
         ctx['scales'] = scales
         tpl = "partials/scales.html"
     else:
@@ -302,11 +280,11 @@ async def prog_content(request: Request,
            "prog_input": prog_input, "sel_key": sel_key, "sel_mode": sel_mode}
 
     if prog_view == "guitar":
-        ctx['voicings'] = [_guitar_voicing_data(c, 0) for c in chords]
+        ctx['voicings'] = [_guitar_voicing_data(c) for c in chords]
         ctx['tab_text'] = get_guitar_tab_for_progression(chords)
         tpl = "partials/guitar_prog.html"
     elif prog_view == "keyboard":
-        ctx['voicings'] = [_keyboard_voicing_data(c, 0, figsize=(4, 1.5)) for c in chords]
+        ctx['voicings'] = [_keyboard_voicing_data(c, figsize=(4, 1.5)) for c in chords]
         tpl = "partials/keyboard_prog.html"
     elif prog_view == "intervals":
         ctx['chord_intervals'] = [(c, analyze_chord_intervals(c)) for c in chords]
@@ -338,14 +316,7 @@ async def prog_content(request: Request,
         chord_subs = []
         for c in chords:
             subs = suggest_substitutions(c, key, mode)
-            for s in subs:
-                sub_sym = s['symbol'].split('\u2192')[0].strip().split(' ')[0].strip()
-                try:
-                    sub_c = parse_chord(sub_sym)
-                    s['gv'] = _guitar_voicing_data(sub_c)
-                    s['kv'] = _keyboard_voicing_data(sub_c, figsize=(4, 1.5))
-                except ValueError:
-                    pass
+            _enrich_subs(subs)
             chord_subs.append((c, subs))
         ctx['chord_subs'] = chord_subs
         tpl = "partials/prog_substitutions.html"
@@ -353,18 +324,7 @@ async def prog_content(request: Request,
         chord_scales = []
         for c in chords:
             scales = suggest_scales(c)
-            for s in scales:
-                parts = s['scale'].split(' ', 1)
-                if len(parts) == 2:
-                    s_root, s_name = parts
-                    if s_name in SCALES:
-                        uf = c['use_flats']
-                        sk = _chart_key('scalefret', s_name, s_root, uf)
-                        s['fret_img'] = _fig_to_cached_png(sk, lambda s_name=s_name, s_root=s_root, uf=uf:
-                            render_scale_fretboard(s_name, s_root, SCALES[s_name], use_flats=uf))
-                        sk = _chart_key('scalepiano', s_name, s_root, uf)
-                        s['piano_img'] = _fig_to_cached_png(sk, lambda s_name=s_name, s_root=s_root, uf=uf:
-                            render_scale_piano(s_name, s_root, SCALES[s_name], use_flats=uf))
+            _enrich_scales(scales, c['use_flats'])
             chord_scales.append((c, scales))
         ctx['chord_scales'] = chord_scales
         tpl = "partials/prog_scales.html"
@@ -377,6 +337,14 @@ async def prog_content(request: Request,
 
 # --- Voicing navigation (prev/next via HTMX) ---
 
+_VOICING_NAV_DISPATCH = {
+    "guitar":        (lambda c, idx: _guitar_voicing_data(c, idx),                "partials/_voicing_guitar.html"),
+    "shell_guitar":  (lambda c, idx: _guitar_voicing_data(c, idx, shell=True),    "partials/_voicing_guitar.html"),
+    "keyboard":      (lambda c, idx: _keyboard_voicing_data(c, idx),              "partials/_voicing_keyboard.html"),
+    "shell_keyboard":(lambda c, idx: _keyboard_voicing_data(c, idx, shell=True),  "partials/_voicing_keyboard.html"),
+}
+
+
 @app.get("/partial/voicing_nav", response_class=HTMLResponse)
 async def voicing_nav(request: Request,
                       symbol: str = "Cmaj7",
@@ -387,19 +355,9 @@ async def voicing_nav(request: Request,
     except ValueError as e:
         return HTMLResponse(f'<p class="text-muted">{e}</p>')
 
-    if vtype == "guitar":
-        data = _guitar_voicing_data(c, idx)
-        tpl = "partials/_voicing_guitar.html"
-    elif vtype == "shell_guitar":
-        data = _shell_guitar_data(c, idx)
-        tpl = "partials/_voicing_guitar.html"
-    elif vtype == "keyboard":
-        data = _keyboard_voicing_data(c, idx)
-        tpl = "partials/_voicing_keyboard.html"
-    elif vtype == "shell_keyboard":
-        data = _shell_keyboard_data(c, idx)
-        tpl = "partials/_voicing_keyboard.html"
-    else:
+    entry = _VOICING_NAV_DISPATCH.get(vtype)
+    if not entry:
         return HTMLResponse('<p>Unknown type</p>')
 
-    return templates.TemplateResponse(tpl, {"request": request, "v": data, "vtype": vtype})
+    builder, tpl = entry
+    return templates.TemplateResponse(tpl, {"request": request, "v": builder(c, idx), "vtype": vtype})
