@@ -281,10 +281,12 @@ async def prog_content(request: Request,
 
     if prog_view == "guitar":
         ctx['voicings'] = [_guitar_voicing_data(c) for c in chords]
+        ctx['shell_voicings'] = [_guitar_voicing_data(c, shell=True) for c in chords]
         ctx['tab_text'] = get_guitar_tab_for_progression(chords)
         tpl = "partials/guitar_prog.html"
     elif prog_view == "keyboard":
         ctx['voicings'] = [_keyboard_voicing_data(c, figsize=(4, 1.5)) for c in chords]
+        ctx['shell_voicings'] = [_keyboard_voicing_data(c, figsize=(4, 1.5), shell=True) for c in chords]
         tpl = "partials/keyboard_prog.html"
     elif prog_view == "intervals":
         ctx['chord_intervals'] = [(c, analyze_chord_intervals(c)) for c in chords]

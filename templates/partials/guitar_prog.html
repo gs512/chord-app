@@ -1,27 +1,24 @@
 <h2>Progression in {{ key }} {{ mode }}</h2>
 <p>{{ chords | map(attribute='symbol') | join(' — ') }}</p>
 
+<h3>Full Voicings</h3>
 <div class="chord-grid cols-{{ [chords|length, 4] | min }}">
 {% for v in voicings %}
-<div id="voicing-guitar-{{ v.safe_id }}" class="chord-card">
-    <h3>{{ v.symbol }}</h3>
-    <div class="nav-row">
-        <button class="btn btn-nav" {% if v.idx <= 0 %}disabled{% endif %}
-                hx-get="/partial/voicing_nav?symbol={{ v.symbol | urlencode }}&vtype=guitar&idx={{ v.idx - 1 }}"
-                hx-target="#voicing-guitar-{{ v.safe_id }}" hx-swap="outerHTML">&laquo;</button>
-        <span class="nav-label">{{ v.label }}</span>
-        <button class="btn btn-nav" {% if v.idx >= v.total - 1 %}disabled{% endif %}
-                hx-get="/partial/voicing_nav?symbol={{ v.symbol | urlencode }}&vtype=guitar&idx={{ v.idx + 1 }}"
-                hx-target="#voicing-guitar-{{ v.safe_id }}" hx-swap="outerHTML">&raquo;</button>
-    </div>
-    <img src="{{ v.img }}" alt="{{ v.symbol }}">
-    <p class="caption">{{ v.notes | join(' ') }}</p>
-    {% if v.midi %}
-    <div class="btn-row">
-        <button class="btn btn-play" onclick="playNotes({{ v.midi }}, false)">Play</button>
-        <button class="btn btn-strum" onclick="playNotes({{ v.midi }}, true)">Strum</button>
-    </div>
-    {% endif %}
+<div class="chord-card">
+    <h4>{{ v.symbol }}</h4>
+    {% set vtype = "guitar" %}
+    {% include "partials/_voicing_guitar.html" %}
+</div>
+{% endfor %}
+</div>
+
+<h3>Shell Voicings (Root + 3rd + 7th)</h3>
+<div class="chord-grid cols-{{ [chords|length, 4] | min }}">
+{% for v in shell_voicings %}
+<div class="chord-card">
+    <h4>{{ v.symbol }}</h4>
+    {% set vtype = "shell_guitar" %}
+    {% include "partials/_voicing_guitar.html" %}
 </div>
 {% endfor %}
 </div>
