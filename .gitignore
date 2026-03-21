@@ -1,19 +1,52 @@
 # Python
 __pycache__/
 *.pyc
+*.pyo
+*.pyd
 *.egg-info/
 build/
 dist/
+sdist/
+.eggs/
+*.egg
 
-# System
-.DS_Store
+# Virtual Environments
+venv/
+.venv/
+env/
+ENV/
+bin/
+lib/
+share/
+Include/
+pyvenv.cfg
 
-# IDE
+# IDEs
 .vscode/
+.idea/
+*.swp
+*.swo
 
-# Exclude service account keys and secrets
+# Testing / Coverage
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+.nox/
+.hypothesis/
+
+# Type Checking / Linting
+.mypy_cache/
+.ruff_cache/
+.pyre/
+
+# Environment / Secrets
+.env
 uploader-key.json
 *-key.json
 *.pem
-
 secrets.toml
+
+# System
+.DS_Store
+Thumbs.db
