@@ -25,11 +25,15 @@ from music_theory.keyboard import (
 from music_theory.intervals import (
     analyze_chord_intervals, detect_key, roman_numeral_analysis,
     root_movement_analysis, detect_patterns,
-    get_diatonic_chords, suggest_substitutions, suggest_scales, SCALES
+    get_diatonic_chords, suggest_substitutions, suggest_scales, SCALES,
+    render_circle_of_fifths
 )
 from music_theory.vexflow_render import (
     render_single_chord_html, render_progression_html,
     render_guitar_tab_html
+)
+from music_theory.voice_leading import (
+    optimize_guitar_voice_leading, optimize_keyboard_voice_leading
 )
 
 st.set_page_config(page_title="Chord Voicing & Analysis", layout="wide")
@@ -302,7 +306,19 @@ else:
         )
 
         with tab_guitar:
-            # Fretboard diagrams in columns with voicing navigation
+            vl_guitar = st.checkbox("Optimize Voice Leading", key="vl_guitar")
+            current_prog_g = "|".join(c['symbol'] for c in chords)
+            if vl_guitar:
+                prev_prog = st.session_state.get("vl_guitar_prog", "")
+                if not st.session_state.get("vl_guitar_applied", False) or prev_prog != current_prog_g:
+                    optimal_g = optimize_guitar_voice_leading(chords)
+                    for i, chord in enumerate(chords):
+                        st.session_state[f"gv_prog_g_{i}_{chord['symbol']}"] = optimal_g[i]
+                    st.session_state["vl_guitar_applied"] = True
+                    st.session_state["vl_guitar_prog"] = current_prog_g
+            else:
+                st.session_state["vl_guitar_applied"] = False
+
             cols = st.columns(min(len(chords), 4))
             prog_voicings = []
             for i, chord in enumerate(chords):
@@ -320,6 +336,19 @@ else:
             components.html(tab_html, height=280, scrolling=True)
 
         with tab_keyboard:
+            vl_keyboard = st.checkbox("Optimize Voice Leading", key="vl_keyboard")
+            current_prog_k = "|".join(c['symbol'] for c in chords)
+            if vl_keyboard:
+                prev_prog = st.session_state.get("vl_keyboard_prog", "")
+                if not st.session_state.get("vl_keyboard_applied", False) or prev_prog != current_prog_k:
+                    optimal_k = optimize_keyboard_voice_leading(chords)
+                    for i, chord in enumerate(chords):
+                        st.session_state[f"ki_prog_k_{i}_{chord['symbol']}"] = optimal_k[i]
+                    st.session_state["vl_keyboard_applied"] = True
+                    st.session_state["vl_keyboard_prog"] = current_prog_k
+            else:
+                st.session_state["vl_keyboard_applied"] = False
+
             cols = st.columns(min(len(chords), 4))
             for i, chord in enumerate(chords):
                 with cols[i % len(cols)]:
@@ -363,8 +392,24 @@ else:
                 st.info("No common patterns detected in this progression.")
 
         with tab_diatonic:
+            # Circle of Fifths
+            st.subheader("Circle of Fifths")
+            cof_col1, cof_col2 = st.columns([1, 1])
+            with cof_col1:
+                fig = render_circle_of_fifths(key, mode)
+                st.pyplot(fig, use_container_width=True)
+                plt.close('all')
+            with cof_col2:
+                st.markdown(f"**Detected key:** {key} {mode}")
+                st.markdown("The highlighted segment shows the current key. "
+                            "Major keys are on the outer ring, relative minor keys on the inner ring.")
+
+            # Diatonic chords
             st.subheader(f"Diatonic Chords in {key} {mode}")
-            diatonic = get_diatonic_chords(key, mode)
+            chord_type = st.radio("Chord type", ["Triads", "7th Chords"],
+                                  horizontal=True, key="dia_chord_type")
+            ct = 'triad' if chord_type == "Triads" else '7th'
+            diatonic = get_diatonic_chords(key, mode, chord_type=ct)
             dia_df = pd.DataFrame(diatonic)
             dia_df.columns = ['Numeral', 'Root', 'Quality', 'Chord']
             st.table(dia_df)
@@ -386,8 +431,8 @@ else:
                     try:
                         dc = parse_chord(d['symbol'])
                         st.markdown(f"**{d['numeral']}** — {d['symbol']}")
-                        render_guitar_nav(dc, f"dia_g_{i}_{d['symbol']}", compact=True)
-                        render_keyboard_nav(dc, f"dia_k_{i}_{d['symbol']}", compact=True, figsize=(4, 1.5))
+                        render_guitar_nav(dc, f"dia_g_{ct}_{i}_{d['symbol']}", compact=True)
+                        render_keyboard_nav(dc, f"dia_k_{ct}_{i}_{d['symbol']}", compact=True, figsize=(4, 1.5))
                     except ValueError:
                         st.caption(d['symbol'])
 
