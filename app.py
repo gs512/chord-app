@@ -154,7 +154,7 @@ def render_keyboard_nav(chord, key_prefix, compact=False, figsize=(6, 2.5)):
     kb_voicing = inversions[idx]
     key = _chart_key('piano', chord['symbol'], tuple(tuple(v) for v in kb_voicing), figsize)
     img = _fig_to_cached_png(key, lambda: render_piano(chord, voicing=kb_voicing, figsize=figsize))
-    st.image(img, use_container_width=not compact)
+    st.image(img, width='stretch' if not compact else 'content')
     notes_str = ', '.join(f"{n}{o}" for n, o, _ in kb_voicing)
     st.caption(f"{notes_str}")
     midi_notes = [m for _, _, m in kb_voicing]
@@ -197,7 +197,7 @@ def render_shell_keyboard_nav(chord, key_prefix, compact=False, figsize=(6, 2.5)
     kb_voicing = inversions[idx]
     key = _chart_key('shellpiano', chord['symbol'], tuple(tuple(v) for v in kb_voicing), figsize)
     img = _fig_to_cached_png(key, lambda: render_piano(chord, voicing=kb_voicing, figsize=figsize))
-    st.image(img, use_container_width=not compact)
+    st.image(img, width='stretch' if not compact else 'content')
     notes_str = ', '.join(f"{n}{o}" for n, o, _ in kb_voicing)
     st.caption(f"{notes_str}")
     midi_notes = [m for _, _, m in kb_voicing]
@@ -305,12 +305,12 @@ if input_mode == "Single Chord":
                                         sk = _chart_key('scalefret', s_name, s_root, _uf)
                                         img = _fig_to_cached_png(sk, lambda: render_scale_fretboard(
                                             s_name, s_root, SCALES[s_name], use_flats=_uf))
-                                        st.image(img, use_container_width=True)
+                                        st.image(img, width='stretch')
                                     with col_k:
                                         sk = _chart_key('scalepiano', s_name, s_root, _uf)
                                         img = _fig_to_cached_png(sk, lambda: render_scale_piano(
                                             s_name, s_root, SCALES[s_name], use_flats=_uf))
-                                        st.image(img, use_container_width=True)
+                                        st.image(img, width='stretch')
             else:
                 st.info("No scale suggestions available.")
 
@@ -451,7 +451,7 @@ else:
             with cof_col1:
                 cof_key = _chart_key('cof', key, mode)
                 cof_img = _fig_to_cached_png(cof_key, lambda: render_circle_of_fifths(key, mode))
-                st.image(cof_img, use_container_width=True)
+                st.image(cof_img, width='stretch')
             with cof_col2:
                 st.markdown(f"**Detected key:** {key} {mode}")
                 st.markdown("The highlighted segment shows the current key. "
@@ -549,9 +549,9 @@ else:
                                             sk = _chart_key('scalefret', s_name, s_root, _uf)
                                             img = _fig_to_cached_png(sk, lambda: render_scale_fretboard(
                                                 s_name, s_root, SCALES[s_name], use_flats=_uf))
-                                            st.image(img, use_container_width=True)
+                                            st.image(img, width='stretch')
                                         with col_k:
                                             sk = _chart_key('scalepiano', s_name, s_root, _uf)
                                             img = _fig_to_cached_png(sk, lambda: render_scale_piano(
                                                 s_name, s_root, SCALES[s_name], use_flats=_uf))
-                                            st.image(img, use_container_width=True)
+                                            st.image(img, width='stretch')
