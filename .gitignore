@@ -1,0 +1,19 @@
+# Python
+__pycache__/
+*.pyc
+*.egg-info/
+build/
+dist/
+
+# System
+.DS_Store
+
+# IDE
+.vscode/
+
+# Exclude service account keys and secrets
+uploader-key.json
+*-key.json
+*.pem
+
+secrets.toml
