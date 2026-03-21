@@ -9,3 +9,6 @@ dependencies = [
     "jinja2>=3.1.0",
     "matplotlib>=3.8.0",
 ]
+
+[tool.setuptools.packages.find]
+include = ["music_theory*"]
