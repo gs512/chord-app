@@ -9,7 +9,7 @@ import streamlit.components.v1 as components
 import pandas as pd
 import matplotlib.pyplot as plt
 
-from music_theory.chords import parse_chord, parse_progression, note_to_semitone
+from music_theory.chords import parse_chord, parse_progression, note_to_semitone, semitone_to_note
 from music_theory.guitar import (
     generate_voicing, generate_all_voicings, render_fretboard, voicing_to_tab,
     voicing_to_notes, voicing_to_midi, get_guitar_tab_for_progression,
