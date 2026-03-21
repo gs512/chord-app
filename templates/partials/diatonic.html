@@ -44,14 +44,12 @@
 {% if d.gv is defined and d.gv %}
 <div class="chord-card">
     <h4>{{ d.numeral }} — {{ d.symbol }}</h4>
-    <img src="{{ d.gv.img }}" alt="{{ d.symbol }} guitar" style="width:100%">
-    <img src="{{ d.kv.img }}" alt="{{ d.symbol }} keyboard" style="width:100%">
-    {% if d.gv.midi %}
-    <div class="btn-row">
-        <button class="btn btn-play" onclick="playNotes({{ d.gv.midi }}, false)">Play</button>
-        <button class="btn btn-strum" onclick="playNotes({{ d.gv.midi }}, true)">Strum</button>
-    </div>
-    {% endif %}
+    {% set v = d.gv %}
+    {% set vtype = "guitar" %}
+    {% include "partials/_voicing_guitar.html" %}
+    {% set v = d.kv %}
+    {% set vtype = "keyboard" %}
+    {% include "partials/_voicing_keyboard.html" %}
 </div>
 {% endif %}
 {% endfor %}

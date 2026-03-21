@@ -6,8 +6,16 @@
     <p class="text-muted">{{ s.reason }}</p>
     {% if s.gv is defined and s.gv %}
     <div class="two-col">
-        <div><img src="{{ s.gv.img }}" alt="{{ s.symbol }} guitar" style="width:100%"></div>
-        <div><img src="{{ s.kv.img }}" alt="{{ s.symbol }} keyboard" style="width:100%"></div>
+        <div>
+            {% set v = s.gv %}
+            {% set vtype = "guitar" %}
+            {% include "partials/_voicing_guitar.html" %}
+        </div>
+        <div>
+            {% set v = s.kv %}
+            {% set vtype = "keyboard" %}
+            {% include "partials/_voicing_keyboard.html" %}
+        </div>
     </div>
     {% endif %}
 </div>
