@@ -7,8 +7,8 @@ and interval analysis for chords and progressions.
 import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
-plt.rcParams['figure.dpi'] = 72
-plt.rcParams['savefig.dpi'] = 72
+plt.rcParams['figure.dpi'] = 120
+plt.rcParams['savefig.dpi'] = 120
 
 import hashlib
 from pathlib import Path
@@ -226,31 +226,32 @@ if input_mode == "Single Chord":
 
         st.header(f"{chord['symbol']}")
 
-        # Tabs for different views
-        tab_guitar, tab_keyboard, tab_score, tab_intervals, tab_subs, tab_scales = st.tabs(
-            ["Guitar", "Keyboard", "Score", "Intervals", "Substitutions", "Scales"]
+        # Lazy view selector — only renders the active view
+        single_view = st.radio(
+            "View", ["Guitar", "Keyboard", "Score", "Intervals", "Substitutions", "Scales"],
+            horizontal=True, key="single_view"
         )
 
-        with tab_guitar:
+        if single_view == "Guitar":
             st.subheader("Full Voicing")
             voicing = render_guitar_nav(chord, f"single_{chord_input}")
 
             st.subheader("Shell Voicing (Root + 3rd + 7th)")
             render_shell_guitar_nav(chord, f"single_shell_{chord_input}")
 
-        with tab_keyboard:
+        elif single_view == "Keyboard":
             st.subheader("Full Voicing")
             render_keyboard_nav(chord, f"single_{chord_input}")
 
             st.subheader("Shell Voicing (Root + 3rd + 7th)")
             render_shell_keyboard_nav(chord, f"single_shell_{chord_input}")
 
-        with tab_score:
+        elif single_view == "Score":
             st.subheader("Musical Score")
             html = render_single_chord_html(chord)
             components.html(html, height=280, scrolling=False)
 
-        with tab_intervals:
+        elif single_view == "Intervals":
             st.subheader("Interval Analysis")
             intervals = analyze_chord_intervals(chord)
             df = pd.DataFrame(intervals)
@@ -260,7 +261,7 @@ if input_mode == "Single Chord":
             st.caption(f"Root: **{chord['root']}** | Quality: **{chord['quality']}** | "
                        f"Formula: {' '.join(chord['interval_labels'])}")
 
-        with tab_subs:
+        elif single_view == "Substitutions":
             st.subheader("Chord Substitutions")
             subs = suggest_substitutions(chord)
             if subs:
@@ -283,7 +284,7 @@ if input_mode == "Single Chord":
             else:
                 st.info("No common substitutions for this chord type.")
 
-        with tab_scales:
+        elif single_view == "Scales":
             st.subheader("Scales for Improvisation")
             scales = suggest_scales(chord)
             if scales:
@@ -356,11 +357,13 @@ else:
         st.header(f"Progression in {key} {mode}")
         st.write(" — ".join(c['symbol'] for c in chords))
 
-        tab_guitar, tab_keyboard, tab_score, tab_intervals, tab_diatonic, tab_subs, tab_scales = st.tabs(
-            ["Guitar", "Keyboard", "Score", "Intervals", "Diatonic", "Substitutions", "Scales"]
+        # Lazy view selector — only renders the active view
+        prog_view = st.radio(
+            "View", ["Guitar", "Keyboard", "Score", "Intervals", "Diatonic", "Substitutions", "Scales"],
+            horizontal=True, key="prog_view"
         )
 
-        with tab_guitar:
+        if prog_view == "Guitar":
             vl_guitar = st.checkbox("Optimize Voice Leading", key="vl_guitar")
             current_prog_g = "|".join(c['symbol'] for c in chords)
             if vl_guitar:
@@ -375,17 +378,15 @@ else:
                 st.session_state["vl_guitar_applied"] = False
 
             cols = st.columns(min(len(chords), 4))
-            prog_voicings = []
             for i, chord in enumerate(chords):
                 with cols[i % len(cols)]:
-                    v = render_guitar_nav(chord, f"prog_g_{i}_{chord['symbol']}", compact=True)
-                    prog_voicings.append(v)
+                    render_guitar_nav(chord, f"prog_g_{i}_{chord['symbol']}", compact=True)
 
             st.subheader("Combined Tablature")
             tab_text = get_guitar_tab_for_progression(chords)
             st.code(tab_text, language=None)
 
-        with tab_keyboard:
+        elif prog_view == "Keyboard":
             vl_keyboard = st.checkbox("Optimize Voice Leading", key="vl_keyboard")
             current_prog_k = "|".join(c['symbol'] for c in chords)
             if vl_keyboard:
@@ -404,12 +405,14 @@ else:
                 with cols[i % len(cols)]:
                     render_keyboard_nav(chord, f"prog_k_{i}_{chord['symbol']}", compact=True, figsize=(4, 1.5))
 
-        with tab_score:
+        elif prog_view == "Score":
             st.subheader("Musical Score & Tab")
-            html = render_combined_score_tab_html(chords, prog_voicings)
+            # Generate default voicings for score rendering
+            score_voicings = [_cached_all_voicings(c['symbol'])[0] for c in chords]
+            html = render_combined_score_tab_html(chords, score_voicings)
             components.html(html, height=500, scrolling=True)
 
-        with tab_intervals:
+        elif prog_view == "Intervals":
             st.subheader("Chord Interval Analysis")
             for chord in chords:
                 intervals = analyze_chord_intervals(chord)
@@ -441,7 +444,7 @@ else:
             else:
                 st.info("No common patterns detected in this progression.")
 
-        with tab_diatonic:
+        elif prog_view == "Diatonic":
             # Circle of Fifths
             st.subheader("Circle of Fifths")
             cof_col1, cof_col2 = st.columns([1, 1])
@@ -502,7 +505,7 @@ else:
                         except ValueError:
                             st.caption(d['symbol'])
 
-        with tab_subs:
+        elif prog_view == "Substitutions":
             st.subheader("Substitution Suggestions")
             show_sub_v = st.checkbox("Show voicing diagrams", key="prog_sub_voicings")
             for ci, chord in enumerate(chords):
@@ -524,7 +527,7 @@ else:
                                 except ValueError:
                                     pass
 
-        with tab_scales:
+        elif prog_view == "Scales":
             st.subheader("Scale Suggestions per Chord")
             show_scale_diagrams = st.checkbox("Show scale diagrams", key="show_scale_diags")
             for chord in chords:
