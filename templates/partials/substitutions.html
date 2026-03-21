@@ -4,6 +4,12 @@
 <div style="margin-bottom:10px">
     <strong>{{ s.type }}:</strong> <code>{{ s.symbol }}</code>
     <p class="text-muted">{{ s.reason }}</p>
+    {% if s.gv is defined and s.gv %}
+    <div class="two-col">
+        <div><img src="{{ s.gv.img }}" alt="{{ s.symbol }} guitar" style="width:100%"></div>
+        <div><img src="{{ s.kv.img }}" alt="{{ s.symbol }} keyboard" style="width:100%"></div>
+    </div>
+    {% endif %}
 </div>
 {% if not loop.last %}<div class="divider"></div>{% endif %}
 {% endfor %}

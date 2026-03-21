@@ -9,6 +9,12 @@
         ({% if s.reason.startswith('Primary') %}Primary{% else %}Compatible{% endif %})</p>
         <pre class="tab-text">{{ s.notes }}</pre>
         <p class="text-muted">{{ s.reason }}</p>
+        {% if s.fret_img is defined and s.fret_img %}
+        <div class="two-col">
+            <div><img src="{{ s.fret_img }}" alt="{{ s.scale }} fretboard" style="width:100%"></div>
+            <div><img src="{{ s.piano_img }}" alt="{{ s.scale }} piano" style="width:100%"></div>
+        </div>
+        {% endif %}
         {% if not loop.last %}<div class="divider"></div>{% endif %}
     {% endfor %}
     </div>

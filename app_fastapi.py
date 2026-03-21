@@ -246,11 +246,32 @@ async def single_content(request: Request,
         ctx['intervals'] = analyze_chord_intervals(c)
         tpl = "partials/intervals_single.html"
     elif single_view == "substitutions":
-        ctx['subs'] = suggest_substitutions(c)
+        subs = suggest_substitutions(c)
+        for s in subs:
+            sub_sym = s['symbol'].split('\u2192')[0].strip().split(' ')[0].strip()
+            try:
+                sub_c = parse_chord(sub_sym)
+                s['gv'] = _guitar_voicing_data(sub_c)
+                s['kv'] = _keyboard_voicing_data(sub_c, figsize=(4, 1.5))
+            except ValueError:
+                pass
+        ctx['subs'] = subs
         tpl = "partials/substitutions.html"
     elif single_view == "scales":
-        ctx['scales'] = suggest_scales(c)
-        ctx['SCALES'] = SCALES
+        scales = suggest_scales(c)
+        for s in scales:
+            parts = s['scale'].split(' ', 1)
+            if len(parts) == 2:
+                s_root, s_name = parts
+                if s_name in SCALES:
+                    uf = c['use_flats']
+                    sk = _chart_key('scalefret', s_name, s_root, uf)
+                    s['fret_img'] = _fig_to_cached_png(sk, lambda s_name=s_name, s_root=s_root, uf=uf:
+                        render_scale_fretboard(s_name, s_root, SCALES[s_name], use_flats=uf))
+                    sk = _chart_key('scalepiano', s_name, s_root, uf)
+                    s['piano_img'] = _fig_to_cached_png(sk, lambda s_name=s_name, s_root=s_root, uf=uf:
+                        render_scale_piano(s_name, s_root, SCALES[s_name], use_flats=uf))
+        ctx['scales'] = scales
         tpl = "partials/scales.html"
     else:
         return HTMLResponse('<p class="alert alert-warning">Unknown view.</p>')
@@ -307,10 +328,38 @@ async def prog_content(request: Request,
         ctx['chromatic'] = [c['symbol'] for c in chords if c['root_semitone'] not in dia_roots]
         tpl = "partials/diatonic.html"
     elif prog_view == "substitutions":
-        ctx['chord_subs'] = [(c, suggest_substitutions(c, key, mode)) for c in chords]
+        chord_subs = []
+        for c in chords:
+            subs = suggest_substitutions(c, key, mode)
+            for s in subs:
+                sub_sym = s['symbol'].split('\u2192')[0].strip().split(' ')[0].strip()
+                try:
+                    sub_c = parse_chord(sub_sym)
+                    s['gv'] = _guitar_voicing_data(sub_c)
+                    s['kv'] = _keyboard_voicing_data(sub_c, figsize=(4, 1.5))
+                except ValueError:
+                    pass
+            chord_subs.append((c, subs))
+        ctx['chord_subs'] = chord_subs
         tpl = "partials/prog_substitutions.html"
     elif prog_view == "scales":
-        ctx['chord_scales'] = [(c, suggest_scales(c)) for c in chords]
+        chord_scales = []
+        for c in chords:
+            scales = suggest_scales(c)
+            for s in scales:
+                parts = s['scale'].split(' ', 1)
+                if len(parts) == 2:
+                    s_root, s_name = parts
+                    if s_name in SCALES:
+                        uf = c['use_flats']
+                        sk = _chart_key('scalefret', s_name, s_root, uf)
+                        s['fret_img'] = _fig_to_cached_png(sk, lambda s_name=s_name, s_root=s_root, uf=uf:
+                            render_scale_fretboard(s_name, s_root, SCALES[s_name], use_flats=uf))
+                        sk = _chart_key('scalepiano', s_name, s_root, uf)
+                        s['piano_img'] = _fig_to_cached_png(sk, lambda s_name=s_name, s_root=s_root, uf=uf:
+                            render_scale_piano(s_name, s_root, SCALES[s_name], use_flats=uf))
+            chord_scales.append((c, scales))
+        ctx['chord_scales'] = chord_scales
         tpl = "partials/prog_scales.html"
     else:
         return HTMLResponse('<p class="alert alert-warning">Unknown view.</p>')
