@@ -406,9 +406,16 @@ else:
 
             # Diatonic chords
             st.subheader(f"Diatonic Chords in {key} {mode}")
-            chord_type = st.radio("Chord type", ["Triads", "7th Chords"],
-                                  horizontal=True, key="dia_chord_type")
-            ct = 'triad' if chord_type == "Triads" else '7th'
+            chord_type = st.radio(
+                "Chord type",
+                ["Triads", "7th Chords", "9th Chords", "Sus4", "Sus2", "Add9", "6th Chords"],
+                horizontal=True, key="dia_chord_type"
+            )
+            _ct_map = {
+                "Triads": "triad", "7th Chords": "7th", "9th Chords": "9th",
+                "Sus4": "sus4", "Sus2": "sus2", "Add9": "add9", "6th Chords": "6th",
+            }
+            ct = _ct_map[chord_type]
             diatonic = get_diatonic_chords(key, mode, chord_type=ct)
             dia_df = pd.DataFrame(diatonic)
             dia_df.columns = ['Numeral', 'Root', 'Quality', 'Chord']

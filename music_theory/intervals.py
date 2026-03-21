@@ -317,6 +317,76 @@ DIATONIC_MINOR_7THS = [
     ('V', '7'), ('VI', 'maj7'), ('vii\u00b0', 'dim7'),
 ]
 
+# Diatonic 9th chords
+DIATONIC_MAJOR_9THS = [
+    ('I', 'maj9'), ('ii', 'm9'), ('iii', 'm7'), ('IV', 'maj9'),
+    ('V', '9'), ('vi', 'm9'), ('vii\u00f8', 'm7b5'),
+]
+# iii stays m7 (diatonic 9th is b9, uncommon), vii stays m7b5 (same reason)
+
+DIATONIC_MINOR_9THS = [
+    ('i', 'mM7'), ('ii\u00f8', 'm7b5'), ('III', 'maj9'), ('iv', 'm9'),
+    ('V', '9'), ('VI', 'maj9'), ('vii\u00b0', 'dim7'),
+]
+# i stays mM7 (9 works but mM9 not in formulas), ii/vii stay as-is (b9)
+
+# Diatonic sus4 chords
+DIATONIC_MAJOR_SUS4 = [
+    ('I', 'sus4'), ('II', 'sus4'), ('III', 'sus4'), ('IV', 'sus4'),
+    ('V', 'sus4'), ('VI', 'sus4'), ('VII', 'sus4'),
+]
+
+DIATONIC_MINOR_SUS4 = [
+    ('i', 'sus4'), ('II', 'sus4'), ('III', 'sus4'), ('iv', 'sus4'),
+    ('V', 'sus4'), ('VI', 'sus4'), ('VII', 'sus4'),
+]
+
+# Diatonic sus2 chords
+DIATONIC_MAJOR_SUS2 = [
+    ('I', 'sus2'), ('II', 'sus2'), ('III', 'sus2'), ('IV', 'sus2'),
+    ('V', 'sus2'), ('VI', 'sus2'), ('VII', 'sus2'),
+]
+
+DIATONIC_MINOR_SUS2 = [
+    ('i', 'sus2'), ('II', 'sus2'), ('III', 'sus2'), ('iv', 'sus2'),
+    ('V', 'sus2'), ('VI', 'sus2'), ('VII', 'sus2'),
+]
+
+# Diatonic add9 chords
+DIATONIC_MAJOR_ADD9 = [
+    ('I', 'add9'), ('ii', 'madd9'), ('iii', 'm'), ('IV', 'add9'),
+    ('V', 'add9'), ('vi', 'madd9'), ('vii\u00b0', 'dim'),
+]
+# iii and vii get b9 diatonically, so fall back to simpler forms
+
+DIATONIC_MINOR_ADD9 = [
+    ('i', 'madd9'), ('ii\u00b0', 'dim'), ('III', 'add9'), ('iv', 'madd9'),
+    ('V', 'add9'), ('VI', 'add9'), ('vii\u00b0', 'dim'),
+]
+
+# Diatonic 6th chords
+DIATONIC_MAJOR_6THS = [
+    ('I', '6'), ('ii', 'm6'), ('iii', 'm'), ('IV', '6'),
+    ('V', '6'), ('vi', 'm6'), ('vii\u00b0', 'dim'),
+]
+# iii gets b6 diatonically (dim interval), vii same — fall back
+
+DIATONIC_MINOR_6THS = [
+    ('i', 'm6'), ('ii\u00b0', 'dim'), ('III', '6'), ('iv', 'm6'),
+    ('V', '6'), ('VI', '6'), ('vii\u00b0', 'dim'),
+]
+
+# Lookup table for chord_type -> (major_degrees, minor_degrees)
+DIATONIC_TABLES = {
+    'triad': (DIATONIC_MAJOR_TRIADS, DIATONIC_MINOR_TRIADS),
+    '7th':   (DIATONIC_MAJOR_7THS, DIATONIC_MINOR_7THS),
+    '9th':   (DIATONIC_MAJOR_9THS, DIATONIC_MINOR_9THS),
+    'sus4':  (DIATONIC_MAJOR_SUS4, DIATONIC_MINOR_SUS4),
+    'sus2':  (DIATONIC_MAJOR_SUS2, DIATONIC_MINOR_SUS2),
+    'add9':  (DIATONIC_MAJOR_ADD9, DIATONIC_MINOR_ADD9),
+    '6th':   (DIATONIC_MAJOR_6THS, DIATONIC_MINOR_6THS),
+}
+
 # Scale definitions: name -> list of semitone intervals from root
 SCALES = {
     'Major (Ionian)':       [0, 2, 4, 5, 7, 9, 11],
@@ -344,7 +414,7 @@ SCALES = {
 def get_diatonic_chords(key: str, mode: str = 'major', chord_type: str = '7th') -> List[dict]:
     """
     Return the diatonic chords for a given key.
-    chord_type: 'triad' or '7th'.
+    chord_type: 'triad', '7th', '9th', 'sus4', 'sus2', 'add9', '6th'.
     Each entry: {numeral, root, quality, symbol}
     """
     key_semitone = note_to_semitone(key)
@@ -352,13 +422,11 @@ def get_diatonic_chords(key: str, mode: str = 'major', chord_type: str = '7th') 
 
     if mode == 'minor':
         scale = [0, 2, 3, 5, 7, 8, 10]
-        # Harmonic minor scale for V and vii chords
-        harm_scale = [0, 2, 3, 5, 7, 8, 11]
-        degrees = DIATONIC_MINOR_TRIADS if chord_type == 'triad' else DIATONIC_MINOR_7THS
     else:
         scale = MAJOR_SCALE
-        harm_scale = MAJOR_SCALE
-        degrees = DIATONIC_MAJOR_TRIADS if chord_type == 'triad' else DIATONIC_MAJOR_7THS
+
+    major_table, minor_table = DIATONIC_TABLES.get(chord_type, DIATONIC_TABLES['7th'])
+    degrees = minor_table if mode == 'minor' else major_table
 
     result = []
     for i, (numeral, quality) in enumerate(degrees):
