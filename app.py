@@ -4,10 +4,18 @@ Displays guitar and keyboard voicings, tablature, musical score,
 and interval analysis for chords and progressions.
 """
 
+import matplotlib
+matplotlib.use('Agg')
+import matplotlib.pyplot as plt
+plt.rcParams['figure.dpi'] = 72
+plt.rcParams['savefig.dpi'] = 72
+
+import hashlib
+from pathlib import Path
+
 import streamlit as st
 import streamlit.components.v1 as components
 import pandas as pd
-import matplotlib.pyplot as plt
 
 from music_theory.chords import parse_chord, parse_progression, note_to_semitone, semitone_to_note
 from music_theory.guitar import (
@@ -30,7 +38,7 @@ from music_theory.intervals import (
 )
 from music_theory.vexflow_render import (
     render_single_chord_html, render_progression_html,
-    render_guitar_tab_html
+    render_guitar_tab_html, render_combined_score_tab_html
 )
 from music_theory.voice_leading import (
     optimize_guitar_voice_leading, optimize_keyboard_voice_leading
@@ -39,6 +47,28 @@ from music_theory.voice_leading import (
 st.set_page_config(page_title="Chord Voicing & Analysis", layout="wide")
 
 st.title("Chord Voicing & Analysis")
+
+
+# --- PNG disk cache for matplotlib figures (critical for RPi) ---
+
+_CHART_CACHE = Path(__file__).parent / '.cache' / 'charts'
+_CHART_CACHE.mkdir(parents=True, exist_ok=True)
+
+
+def _chart_key(*parts):
+    """Filesystem-safe hash from arbitrary parts."""
+    raw = '|'.join(str(p) for p in parts)
+    return hashlib.md5(raw.encode()).hexdigest()
+
+
+def _fig_to_cached_png(cache_key, render_fn):
+    """Return path to cached PNG; render + save on miss."""
+    path = _CHART_CACHE / f"{cache_key}.png"
+    if not path.exists():
+        fig = render_fn()
+        fig.savefig(path, bbox_inches='tight', facecolor='white', pad_inches=0.1)
+        plt.close(fig)
+    return str(path)
 
 
 # --- Cached voicing generation (avoid recomputing on every rerun) ---
@@ -58,11 +88,6 @@ def _cached_all_shell_voicings(symbol):
 @st.cache_data
 def _cached_shell_keyboard_inversions(symbol):
     return generate_shell_keyboard_inversions(parse_chord(symbol))
-
-@st.cache_data
-def _cached_circle_of_fifths(key, mode):
-    fig = render_circle_of_fifths(key, mode)
-    return fig
 
 
 def _nav_buttons(state_key, count, labels=None, compact=False):
@@ -102,8 +127,9 @@ def render_guitar_nav(chord, key_prefix, compact=False):
     labels = [f"Voicing {i+1}/{len(all_v)}" for i in range(len(all_v))]
     idx = _nav_buttons(f"gv_{key_prefix}", len(all_v), labels, compact=compact)
     voicing = all_v[idx]
-    fig = render_fretboard(chord, voicing)
-    st.pyplot(fig, use_container_width=False)
+    key = _chart_key('fret', chord['symbol'], tuple(voicing))
+    img = _fig_to_cached_png(key, lambda: render_fretboard(chord, voicing))
+    st.image(img)
     if not compact:
         tab_text = voicing_to_tab(chord['symbol'], voicing)
         st.code(tab_text, language=None)
@@ -114,7 +140,6 @@ def render_guitar_nav(chord, key_prefix, compact=False):
     if midi_notes:
         html = render_play_button_html(midi_notes, f"gv_{key_prefix}_{idx}", show_strum=True)
         components.html(html, height=45)
-    plt.close('all')
     return voicing
 
 
@@ -127,15 +152,15 @@ def render_keyboard_nav(chord, key_prefix, compact=False, figsize=(6, 2.5)):
     ]
     idx = _nav_buttons(f"ki_{key_prefix}", len(inversions), labels, compact=compact)
     kb_voicing = inversions[idx]
-    fig = render_piano(chord, voicing=kb_voicing, figsize=figsize)
-    st.pyplot(fig, use_container_width=not compact)
+    key = _chart_key('piano', chord['symbol'], tuple(tuple(v) for v in kb_voicing), figsize)
+    img = _fig_to_cached_png(key, lambda: render_piano(chord, voicing=kb_voicing, figsize=figsize))
+    st.image(img, use_container_width=not compact)
     notes_str = ', '.join(f"{n}{o}" for n, o, _ in kb_voicing)
     st.caption(f"{notes_str}")
     midi_notes = [m for _, _, m in kb_voicing]
     if midi_notes:
         html = render_play_button_html(midi_notes, f"ki_{key_prefix}_{idx}")
         components.html(html, height=45)
-    plt.close('all')
     return kb_voicing
 
 
@@ -145,8 +170,9 @@ def render_shell_guitar_nav(chord, key_prefix, compact=False):
     labels = [f"Shell {i+1}/{len(all_v)}" for i in range(len(all_v))]
     idx = _nav_buttons(f"sg_{key_prefix}", len(all_v), labels, compact=compact)
     voicing = all_v[idx]
-    fig = render_fretboard(chord, voicing)
-    st.pyplot(fig, use_container_width=False)
+    key = _chart_key('shell', chord['symbol'], tuple(voicing))
+    img = _fig_to_cached_png(key, lambda: render_fretboard(chord, voicing))
+    st.image(img)
     if not compact:
         tab_text = voicing_to_tab(chord['symbol'] + ' (shell)', voicing)
         st.code(tab_text, language=None)
@@ -157,7 +183,6 @@ def render_shell_guitar_nav(chord, key_prefix, compact=False):
     if midi_notes:
         html = render_play_button_html(midi_notes, f"sg_{key_prefix}_{idx}", show_strum=True)
         components.html(html, height=45)
-    plt.close('all')
     return voicing
 
 
@@ -170,15 +195,15 @@ def render_shell_keyboard_nav(chord, key_prefix, compact=False, figsize=(6, 2.5)
     ]
     idx = _nav_buttons(f"sk_{key_prefix}", len(inversions), labels, compact=compact)
     kb_voicing = inversions[idx]
-    fig = render_piano(chord, voicing=kb_voicing, figsize=figsize)
-    st.pyplot(fig, use_container_width=not compact)
+    key = _chart_key('shellpiano', chord['symbol'], tuple(tuple(v) for v in kb_voicing), figsize)
+    img = _fig_to_cached_png(key, lambda: render_piano(chord, voicing=kb_voicing, figsize=figsize))
+    st.image(img, use_container_width=not compact)
     notes_str = ', '.join(f"{n}{o}" for n, o, _ in kb_voicing)
     st.caption(f"{notes_str}")
     midi_notes = [m for _, _, m in kb_voicing]
     if midi_notes:
         html = render_play_button_html(midi_notes, f"sk_{key_prefix}_{idx}")
         components.html(html, height=45)
-    plt.close('all')
     return kb_voicing
 
 # --- Input Section ---
@@ -273,16 +298,18 @@ if input_mode == "Single Chord":
                             if len(parts) == 2:
                                 s_root, s_name = parts
                                 if s_name in SCALES:
+                                    _uf = chord['use_flats']
                                     col_g, col_k = st.columns(2)
                                     with col_g:
-                                        fig = render_scale_fretboard(s_name, s_root, SCALES[s_name],
-                                                                     use_flats=chord['use_flats'])
-                                        st.pyplot(fig, use_container_width=True)
+                                        sk = _chart_key('scalefret', s_name, s_root, _uf)
+                                        img = _fig_to_cached_png(sk, lambda: render_scale_fretboard(
+                                            s_name, s_root, SCALES[s_name], use_flats=_uf))
+                                        st.image(img, use_container_width=True)
                                     with col_k:
-                                        fig = render_scale_piano(s_name, s_root, SCALES[s_name],
-                                                                 use_flats=chord['use_flats'])
-                                        st.pyplot(fig, use_container_width=True)
-                                    plt.close('all')
+                                        sk = _chart_key('scalepiano', s_name, s_root, _uf)
+                                        img = _fig_to_cached_png(sk, lambda: render_scale_piano(
+                                            s_name, s_root, SCALES[s_name], use_flats=_uf))
+                                        st.image(img, use_container_width=True)
             else:
                 st.info("No scale suggestions available.")
 
@@ -358,11 +385,6 @@ else:
             tab_text = get_guitar_tab_for_progression(chords)
             st.code(tab_text, language=None)
 
-            # VexFlow guitar tab
-            st.subheader("Guitar Tab (Notation)")
-            tab_html = render_guitar_tab_html(chords, prog_voicings)
-            components.html(tab_html, height=280, scrolling=True)
-
         with tab_keyboard:
             vl_keyboard = st.checkbox("Optimize Voice Leading", key="vl_keyboard")
             current_prog_k = "|".join(c['symbol'] for c in chords)
@@ -383,9 +405,9 @@ else:
                     render_keyboard_nav(chord, f"prog_k_{i}_{chord['symbol']}", compact=True, figsize=(4, 1.5))
 
         with tab_score:
-            st.subheader("Musical Score")
-            html = render_progression_html(chords)
-            components.html(html, height=280, scrolling=True)
+            st.subheader("Musical Score & Tab")
+            html = render_combined_score_tab_html(chords, prog_voicings)
+            components.html(html, height=500, scrolling=True)
 
         with tab_intervals:
             st.subheader("Chord Interval Analysis")
@@ -424,8 +446,9 @@ else:
             st.subheader("Circle of Fifths")
             cof_col1, cof_col2 = st.columns([1, 1])
             with cof_col1:
-                fig = _cached_circle_of_fifths(key, mode)
-                st.pyplot(fig, use_container_width=True)
+                cof_key = _chart_key('cof', key, mode)
+                cof_img = _fig_to_cached_png(cof_key, lambda: render_circle_of_fifths(key, mode))
+                st.image(cof_img, use_container_width=True)
             with cof_col2:
                 st.markdown(f"**Detected key:** {key} {mode}")
                 st.markdown("The highlighted segment shows the current key. "
@@ -517,13 +540,15 @@ else:
                                 if len(parts) == 2:
                                     s_root, s_name = parts
                                     if s_name in SCALES:
+                                        _uf = chord['use_flats']
                                         col_g, col_k = st.columns(2)
                                         with col_g:
-                                            fig = render_scale_fretboard(s_name, s_root, SCALES[s_name],
-                                                                         use_flats=chord['use_flats'])
-                                            st.pyplot(fig, use_container_width=True)
+                                            sk = _chart_key('scalefret', s_name, s_root, _uf)
+                                            img = _fig_to_cached_png(sk, lambda: render_scale_fretboard(
+                                                s_name, s_root, SCALES[s_name], use_flats=_uf))
+                                            st.image(img, use_container_width=True)
                                         with col_k:
-                                            fig = render_scale_piano(s_name, s_root, SCALES[s_name],
-                                                                     use_flats=chord['use_flats'])
-                                            st.pyplot(fig, use_container_width=True)
-                                        plt.close('all')
+                                            sk = _chart_key('scalepiano', s_name, s_root, _uf)
+                                            img = _fig_to_cached_png(sk, lambda: render_scale_piano(
+                                                s_name, s_root, SCALES[s_name], use_flats=_uf))
+                                            st.image(img, use_container_width=True)
