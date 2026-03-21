@@ -41,6 +41,30 @@ st.set_page_config(page_title="Chord Voicing & Analysis", layout="wide")
 st.title("Chord Voicing & Analysis")
 
 
+# --- Cached voicing generation (avoid recomputing on every rerun) ---
+
+@st.cache_data
+def _cached_all_voicings(symbol):
+    return generate_all_voicings(parse_chord(symbol))
+
+@st.cache_data
+def _cached_keyboard_inversions(symbol):
+    return generate_keyboard_inversions(parse_chord(symbol))
+
+@st.cache_data
+def _cached_all_shell_voicings(symbol):
+    return generate_all_shell_voicings(parse_chord(symbol))
+
+@st.cache_data
+def _cached_shell_keyboard_inversions(symbol):
+    return generate_shell_keyboard_inversions(parse_chord(symbol))
+
+@st.cache_data
+def _cached_circle_of_fifths(key, mode):
+    fig = render_circle_of_fifths(key, mode)
+    return fig
+
+
 def _nav_buttons(state_key, count, labels=None, compact=False):
     """Render prev/next navigation buttons. Returns current index."""
     if state_key not in st.session_state:
@@ -74,7 +98,7 @@ def _nav_buttons(state_key, count, labels=None, compact=False):
 
 def render_guitar_nav(chord, key_prefix, compact=False):
     """Render a guitar fretboard with voicing navigation arrows."""
-    all_v = generate_all_voicings(chord)
+    all_v = _cached_all_voicings(chord['symbol'])
     labels = [f"Voicing {i+1}/{len(all_v)}" for i in range(len(all_v))]
     idx = _nav_buttons(f"gv_{key_prefix}", len(all_v), labels, compact=compact)
     voicing = all_v[idx]
@@ -96,7 +120,7 @@ def render_guitar_nav(chord, key_prefix, compact=False):
 
 def render_keyboard_nav(chord, key_prefix, compact=False, figsize=(6, 2.5)):
     """Render a piano keyboard with inversion navigation arrows."""
-    inversions = generate_keyboard_inversions(chord)
+    inversions = _cached_keyboard_inversions(chord['symbol'])
     _suffixes = {1: "st", 2: "nd", 3: "rd"}
     labels = ["Root Position"] + [
         f"{i}{_suffixes.get(i, 'th')} Inv." for i in range(1, len(inversions))
@@ -117,7 +141,7 @@ def render_keyboard_nav(chord, key_prefix, compact=False, figsize=(6, 2.5)):
 
 def render_shell_guitar_nav(chord, key_prefix, compact=False):
     """Render a guitar shell voicing fretboard with navigation arrows."""
-    all_v = generate_all_shell_voicings(chord)
+    all_v = _cached_all_shell_voicings(chord['symbol'])
     labels = [f"Shell {i+1}/{len(all_v)}" for i in range(len(all_v))]
     idx = _nav_buttons(f"sg_{key_prefix}", len(all_v), labels, compact=compact)
     voicing = all_v[idx]
@@ -139,7 +163,7 @@ def render_shell_guitar_nav(chord, key_prefix, compact=False):
 
 def render_shell_keyboard_nav(chord, key_prefix, compact=False, figsize=(6, 2.5)):
     """Render a piano shell voicing with inversion navigation arrows."""
-    inversions = generate_shell_keyboard_inversions(chord)
+    inversions = _cached_shell_keyboard_inversions(chord['symbol'])
     _suffixes = {1: "st", 2: "nd", 3: "rd"}
     labels = ["Root Position"] + [
         f"{i}{_suffixes.get(i, 'th')} Inv." for i in range(1, len(inversions))
@@ -396,9 +420,8 @@ else:
             st.subheader("Circle of Fifths")
             cof_col1, cof_col2 = st.columns([1, 1])
             with cof_col1:
-                fig = render_circle_of_fifths(key, mode)
+                fig = _cached_circle_of_fifths(key, mode)
                 st.pyplot(fig, use_container_width=True)
-                plt.close('all')
             with cof_col2:
                 st.markdown(f"**Detected key:** {key} {mode}")
                 st.markdown("The highlighted segment shows the current key. "
@@ -430,25 +453,25 @@ else:
             else:
                 st.success("All chords are diatonic to the key.")
 
-            # Show fretboard/keyboard for each diatonic chord
-            st.subheader("Diatonic Chord Voicings")
-            cols = st.columns(min(len(diatonic), 4))
-            for i, d in enumerate(diatonic):
-                with cols[i % len(cols)]:
-                    try:
-                        dc = parse_chord(d['symbol'])
-                        st.markdown(f"**{d['numeral']}** — {d['symbol']}")
-                        render_guitar_nav(dc, f"dia_g_{ct}_{i}_{d['symbol']}", compact=True)
-                        render_keyboard_nav(dc, f"dia_k_{ct}_{i}_{d['symbol']}", compact=True, figsize=(4, 1.5))
-                    except ValueError:
-                        st.caption(d['symbol'])
+            # Show fretboard/keyboard for each diatonic chord (lazy-loaded)
+            if st.checkbox("Show diatonic chord voicings", key=f"dia_show_{ct}"):
+                cols = st.columns(min(len(diatonic), 4))
+                for i, d in enumerate(diatonic):
+                    with cols[i % len(cols)]:
+                        try:
+                            dc = parse_chord(d['symbol'])
+                            st.markdown(f"**{d['numeral']}** — {d['symbol']}")
+                            render_guitar_nav(dc, f"dia_g_{ct}_{i}_{d['symbol']}", compact=True)
+                            render_keyboard_nav(dc, f"dia_k_{ct}_{i}_{d['symbol']}", compact=True, figsize=(4, 1.5))
+                        except ValueError:
+                            st.caption(d['symbol'])
 
         with tab_subs:
             st.subheader("Substitution Suggestions")
             for ci, chord in enumerate(chords):
                 subs = suggest_substitutions(chord, key, mode)
                 if subs:
-                    with st.expander(f"{chord['symbol']}", expanded=True):
+                    with st.expander(f"{chord['symbol']}", expanded=False):
                         for si, s in enumerate(subs):
                             sub_sym = s['symbol'].split('\u2192')[0].strip().split(' ')[0].strip()
                             st.markdown(f"**{s['type']}:** `{s['symbol']}`")
@@ -465,6 +488,7 @@ else:
 
         with tab_scales:
             st.subheader("Scale Suggestions per Chord")
+            show_scale_diagrams = st.checkbox("Show scale diagrams", key="show_scale_diags")
             for chord in chords:
                 scales = suggest_scales(chord)
                 if scales:
@@ -473,17 +497,18 @@ else:
                             label = "Primary" if s['reason'].startswith('Primary') else "Compatible"
                             st.markdown(f"**{s['scale']}** ({label})")
                             st.code(s['notes'], language=None)
-                            parts = s['scale'].split(' ', 1)
-                            if len(parts) == 2:
-                                s_root, s_name = parts
-                                if s_name in SCALES:
-                                    col_g, col_k = st.columns(2)
-                                    with col_g:
-                                        fig = render_scale_fretboard(s_name, s_root, SCALES[s_name],
+                            if show_scale_diagrams:
+                                parts = s['scale'].split(' ', 1)
+                                if len(parts) == 2:
+                                    s_root, s_name = parts
+                                    if s_name in SCALES:
+                                        col_g, col_k = st.columns(2)
+                                        with col_g:
+                                            fig = render_scale_fretboard(s_name, s_root, SCALES[s_name],
+                                                                         use_flats=chord['use_flats'])
+                                            st.pyplot(fig, use_container_width=True)
+                                        with col_k:
+                                            fig = render_scale_piano(s_name, s_root, SCALES[s_name],
                                                                      use_flats=chord['use_flats'])
-                                        st.pyplot(fig, use_container_width=True)
-                                    with col_k:
-                                        fig = render_scale_piano(s_name, s_root, SCALES[s_name],
-                                                                 use_flats=chord['use_flats'])
-                                        st.pyplot(fig, use_container_width=True)
-                                    plt.close('all')
+                                            st.pyplot(fig, use_container_width=True)
+                                        plt.close('all')
