@@ -1,11 +1,10 @@
 """
 Generate VexFlow HTML/JS for rendering musical score notation.
 Embeds in Streamlit via st.components.v1.html().
-VexFlow library is loaded from a local file to avoid CDN latency.
+VexFlow library is loaded from CDN (browser-cached after first load).
 """
 
 from typing import List
-from pathlib import Path
 from .chords import parse_chord, semitone_to_note
 
 # Map note names to VexFlow key notation
@@ -20,17 +19,7 @@ NOTE_TO_VEXFLOW = {
     'B': 'b',
 }
 
-# Load VexFlow JS once at import time
-_VEXFLOW_PATH = Path(__file__).parent.parent / 'static' / 'vexflow.js'
-_VEXFLOW_JS = None
-
-
-def _get_vexflow_js() -> str:
-    """Load and cache the VexFlow library source."""
-    global _VEXFLOW_JS
-    if _VEXFLOW_JS is None:
-        _VEXFLOW_JS = _VEXFLOW_PATH.read_text()
-    return _VEXFLOW_JS
+_VEXFLOW_CDN = '<script src="https://cdn.jsdelivr.net/npm/vexflow@4.2.6/build/cjs/vexflow.js"></script>'
 
 
 def chord_to_vexflow_keys(chord: dict, base_octave: int = 4) -> List[str]:
@@ -69,7 +58,7 @@ def render_single_chord_html(chord: dict, width: int = 400, height: int = 250) -
 
     html = f"""
     <div id="vf-single" style="margin: 0 auto;"></div>
-    <script>{_get_vexflow_js()}</script>
+    {_VEXFLOW_CDN}
     <script>
     (function() {{
         const VF = Vex.Flow;
@@ -143,7 +132,7 @@ def render_progression_html(chords: List[dict], width: int = 800, height: int = 
 
     html = f"""
     <div id="vf-progression" style="margin: 0 auto; overflow-x: auto;"></div>
-    <script>{_get_vexflow_js()}</script>
+    {_VEXFLOW_CDN}
     <script>
     (function() {{
         const VF = Vex.Flow;
@@ -217,7 +206,7 @@ def render_guitar_tab_html(chords: List[dict], voicings: List[List[int]],
 
     html = f"""
     <div id="vf-tab" style="margin: 0 auto; overflow-x: auto;"></div>
-    <script>{_get_vexflow_js()}</script>
+    {_VEXFLOW_CDN}
     <script>
     (function() {{
         const VF = Vex.Flow;
@@ -304,7 +293,7 @@ def render_combined_score_tab_html(chords: List[dict], voicings: List[List[int]]
 
     html = f"""
     <div id="vf-combined" style="margin: 0 auto; overflow-x: auto;"></div>
-    <script>{_get_vexflow_js()}</script>
+    {_VEXFLOW_CDN}
     <script>
     (function() {{
         const VF = Vex.Flow;
